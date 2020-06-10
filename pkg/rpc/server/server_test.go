@@ -621,6 +621,16 @@ var rpcTestCases = map[string][]rpcTestCase{
 			},
 		},
 		{
+			name:   "positive, verify hash",
+			params: `["0c285703000c14010c030e05060c0d020e0f0d030e070900000000db307068115541efdfe69421716940",["0x0000000009070e030d0f0e020d0c06050e030c01"]]`,
+			result: func(e *executor) interface{} { return &result.Invoke{} },
+			check: func(t *testing.T, e *executor, inv interface{}) {
+				res, ok := inv.(*result.Invoke)
+				require.True(t, ok)
+				assert.Equal(t, "HALT", res.State)
+			},
+		},
+		{
 			name:   "no params",
 			params: `[]`,
 			fail:   true,

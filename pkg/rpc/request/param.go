@@ -154,6 +154,22 @@ func (p Param) GetBytesHex() ([]byte, error) {
 	return hex.DecodeString(s)
 }
 
+// GetUint160Slice returns a slice of Uint160 stored in the parameter.
+func (p Param) GetUint160Slice() ([]util.Uint160, error) {
+	array, err := p.GetArray()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]util.Uint160, len(array))
+	for i, u := range array {
+		result[i], err = u.GetUint160FromHex()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
+}
+
 // UnmarshalJSON implements json.Unmarshaler interface.
 func (p *Param) UnmarshalJSON(data []byte) error {
 	var s string

@@ -618,7 +618,7 @@ func (s *Server) getDecimals(h util.Uint160, cache map[util.Uint160]int64) (int6
 	if err != nil {
 		return 0, response.NewInternalServerError("Can't create script", err)
 	}
-	res := s.runScriptInVM(script)
+	res := s.runScriptInVM(script, nil)
 	if res == nil || res.State != "HALT" || len(res.Stack) == 0 {
 		return 0, response.NewInternalServerError("execution error", errors.New("no result"))
 	}
@@ -864,11 +864,20 @@ func (s *Server) invokeFunction(reqParams request.Params) (interface{}, *respons
 	if err != nil {
 		return nil, response.ErrInvalidParams
 	}
-	script, err := request.CreateFunctionInvocationScript(scriptHash, reqParams[1:])
+	var checkWitnessHashes []util.Uint160
+	checkWitnessHashesIndex := len(reqParams)
+	if checkWitnessHashesIndex > 3 {
+		checkWitnessHashes, err = reqParams[3].GetUint160Slice()
+		if err != nil {
+			return nil, response.ErrInvalidParams
+		}
+		checkWitnessHashesIndex--
+	}
+	script, err := request.CreateFunctionInvocationScript(scriptHash, reqParams[1:checkWitnessHashesIndex])
 	if err != nil {
 		return nil, response.NewInternalServerError("can't create invocation script", err)
 	}
-	return s.runScriptInVM(script), nil
+	return s.runScriptInVM(script, checkWitnessHashes), nil
 }
 
 // invokescript implements the `invokescript` RPC call.
@@ -881,14 +890,20 @@ func (s *Server) invokescript(reqParams request.Params) (interface{}, *response.
 	if err != nil {
 		return nil, response.ErrInvalidParams
 	}
-
-	return s.runScriptInVM(script), nil
+	var checkWitnessHashes []util.Uint160
+	if len(reqParams) > 1 {
+		checkWitnessHashes, err = reqParams[1].GetUint160Slice()
+		if err != nil {
+			return nil, response.ErrInvalidParams
+		}
+	}
+	return s.runScriptInVM(script, checkWitnessHashes), nil
 }
 
 // runScriptInVM runs given script in a new test VM and returns the invocation
 // result.
-func (s *Server) runScriptInVM(script []byte) *result.Invoke {
-	vm := s.chain.GetTestVM()
+func (s *Server) runScriptInVM(script []byte, checkWitnessHashes []util.Uint160) *result.Invoke {
+	vm := s.chain.GetTestVM(checkWitnessHashes)
 	vm.SetGasLimit(s.config.MaxGasInvoke)
 	vm.LoadScript(script)
 	_ = vm.Run()

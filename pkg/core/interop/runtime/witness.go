@@ -3,6 +3,7 @@ package runtime
 import (
 	"github.com/nspcc-dev/neo-go/pkg/core/interop"
 	"github.com/nspcc-dev/neo-go/pkg/core/transaction"
+	"github.com/nspcc-dev/neo-go/pkg/core/verifiable"
 	"github.com/nspcc-dev/neo-go/pkg/crypto/keys"
 	"github.com/nspcc-dev/neo-go/pkg/util"
 	"github.com/nspcc-dev/neo-go/pkg/vm"
@@ -12,14 +13,21 @@ import (
 // CheckHashedWitness checks given hash against current list of script hashes
 // for verifying in the interop context.
 func CheckHashedWitness(ic *interop.Context, v vm.ScriptHashGetter, hash util.Uint160) (bool, error) {
-	if tx, ok := ic.Container.(*transaction.Transaction); ok {
-		return checkScope(tx, v, hash)
-	}
-
-	// only for non-Transaction types (Block, etc.)
-	hashes, err := ic.Chain.GetScriptHashesForVerifying(ic.Tx)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to get script hashes")
+	var (
+		hashes []util.Uint160
+		err    error
+	)
+	switch t := ic.Container.(type) {
+	case *transaction.Transaction:
+		return checkScope(t, v, hash)
+	case verifiable.CheckWitnessHashes:
+		hashes = t
+	default:
+		// only for non-Transaction types (Block, etc.)
+		hashes, err = ic.Chain.GetScriptHashesForVerifying(ic.Tx)
+		if err != nil {
+			return false, errors.Wrap(err, "failed to get script hashes")
+		}
 	}
 	for _, v := range hashes {
 		if hash.Equals(v) {

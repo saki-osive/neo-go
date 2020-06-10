@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/nspcc-dev/neo-go/pkg/encoding/address"
 	"github.com/nspcc-dev/neo-go/pkg/smartcontract"
 	"github.com/nspcc-dev/neo-go/pkg/util"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestParam_UnmarshalJSON(t *testing.T) {
@@ -213,4 +214,18 @@ func TestParamGetBytesHex(t *testing.T) {
 	p = Param{StringT, "qq2c79718b16e442de58778e148d0b1084e3b2dffd5de6b7b16cee7969282de7"}
 	_, err = p.GetBytesHex()
 	require.NotNil(t, err)
+}
+
+func TestParam_GetUint160Slice(t *testing.T) {
+	u1 := util.Uint160{1, 2, 3, 4}
+	u2 := util.Uint160{5, 6, 7, 8}
+	p := Param{ArrayT, []Param{
+		{Type: StringT, Value: u1.StringLE()},
+		{Type: StringT, Value: u2.StringLE()},
+	}}
+	actual, err := p.GetUint160Slice()
+	require.NoError(t, err)
+	require.Equal(t, 2, len(actual))
+	require.True(t, u1.Equals(actual[0]))
+	require.True(t, u2.Equals(actual[1]))
 }

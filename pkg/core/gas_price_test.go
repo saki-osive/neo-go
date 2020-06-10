@@ -18,7 +18,7 @@ func TestGetPrice(t *testing.T) {
 	bc := newTestChain(t)
 	defer bc.Close()
 	sdao := dao.NewSimple(storage.NewMemoryStore())
-	systemInterop := bc.newInteropContext(trigger.Application, sdao, nil, nil)
+	systemInterop := bc.newInteropContext(trigger.Application, sdao, nil, nil, nil)
 
 	v := SpawnVM(systemInterop)
 	v.SetPriceGetter(getPrice)

@@ -151,7 +151,7 @@ func TestHeaderGetVersion_Negative(t *testing.T) {
 	block := newDumbBlock()
 	chain := newTestChain(t)
 	defer chain.Close()
-	context := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), block, nil)
+	context := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), block, nil, nil)
 	v.Estack().PushVal(stackitem.NewBool(false))
 
 	err := headerGetVersion(context, v)
@@ -196,7 +196,7 @@ func TestWitnessGetVerificationScript(t *testing.T) {
 	chain := newTestChain(t)
 	defer chain.Close()
 
-	context := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), nil, nil)
+	context := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), nil, nil, nil)
 	v.Estack().PushVal(stackitem.NewInterop(&witness))
 	err := witnessGetVerificationScript(context, v)
 	require.NoError(t, err)
@@ -211,7 +211,7 @@ func TestECDSAVerify(t *testing.T) {
 	chain := newTestChain(t)
 	defer chain.Close()
 
-	ic := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), nil, nil)
+	ic := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), nil, nil, nil)
 	runCase := func(t *testing.T, isErr bool, result interface{}, args ...interface{}) {
 		v := vm.New()
 		for i := range args {
@@ -341,7 +341,7 @@ func createVMAndPushBlock(t *testing.T) (*vm.VM, *block.Block, *interop.Context,
 	v := vm.New()
 	block := newDumbBlock()
 	chain := newTestChain(t)
-	context := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), block, nil)
+	context := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), block, nil, nil)
 	v.Estack().PushVal(stackitem.NewInterop(block))
 	return v, block, context, chain
 }
@@ -367,7 +367,7 @@ func createVMAndContractState(t *testing.T) (*vm.VM, *state.Contract, *interop.C
 	}
 
 	chain := newTestChain(t)
-	context := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), nil, nil)
+	context := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), nil, nil, nil)
 	return v, contractState, context, chain
 }
 
@@ -379,7 +379,7 @@ func createVMAndAccState(t *testing.T) (*vm.VM, *state.Account, *interop.Context
 
 	require.NoError(t, err)
 	chain := newTestChain(t)
-	context := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), nil, nil)
+	context := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), nil, nil, nil)
 	return v, accountState, context, chain
 }
 
@@ -396,6 +396,6 @@ func createVMAndTX(t *testing.T) (*vm.VM, *transaction.Transaction, *interop.Con
 
 	tx.Attributes = attributes
 	chain := newTestChain(t)
-	context := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), nil, tx)
+	context := chain.newInteropContext(trigger.Application, dao.NewSimple(storage.NewMemoryStore()), nil, tx, nil)
 	return v, tx, context, chain
 }
