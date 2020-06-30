@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/websocket"
 	"github.com/nspcc-dev/neo-go/pkg/core"
 	"github.com/nspcc-dev/neo-go/pkg/core/block"
@@ -820,6 +821,9 @@ func testRPCProtocol(t *testing.T, doRPCCall func(string, string, *testing.T) []
 						return
 					}
 
+					if method == "getblock" {
+						spew.Dump(result)
+					}
 					expected, res := tc.getResultPair(e)
 					err := json.Unmarshal(result, res)
 					require.NoErrorf(t, err, "could not parse response: %s", result)

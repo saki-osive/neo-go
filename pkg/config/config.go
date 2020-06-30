@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/go-yaml/yaml"
 	"github.com/nspcc-dev/neo-go/pkg/config/netmode"
@@ -30,7 +31,10 @@ func (c Config) GenerateUserAgent() string {
 // Load attempts to load the config from the given
 // path for the given netMode.
 func Load(path string, netMode netmode.Magic) (Config, error) {
-	configPath := fmt.Sprintf("%s/protocol.%s.yml", path, netMode)
+	configPath := path
+	if !strings.HasSuffix(configPath, ".yml") {
+		configPath = fmt.Sprintf("%s/protocol.%s.yml", path, netMode)
+	}
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return Config{}, errors.Wrap(err, "Unable to load config")
 	}

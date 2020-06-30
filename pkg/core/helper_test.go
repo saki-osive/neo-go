@@ -9,12 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/nspcc-dev/neo-go/pkg/config"
+	"github.com/nspcc-dev/neo-go/pkg/config/netmode"
 	"github.com/nspcc-dev/neo-go/pkg/core/block"
 	"github.com/nspcc-dev/neo-go/pkg/core/native"
 	"github.com/nspcc-dev/neo-go/pkg/core/storage"
 	"github.com/nspcc-dev/neo-go/pkg/core/transaction"
 	"github.com/nspcc-dev/neo-go/pkg/crypto/hash"
+	"github.com/nspcc-dev/neo-go/pkg/crypto/keys"
 	"github.com/nspcc-dev/neo-go/pkg/internal/testchain"
 	"github.com/nspcc-dev/neo-go/pkg/internal/testserdes"
 	"github.com/nspcc-dev/neo-go/pkg/io"
@@ -60,7 +63,7 @@ func newBlock(cfg config.ProtocolConfiguration, index uint32, prev util.Uint256,
 	}
 	b := &block.Block{
 		Base: block.Base{
-			Network:       testchain.Network(),
+			Network:       cfg.Magic,
 			Version:       0,
 			PrevHash:      prev,
 			Timestamp:     uint64(time.Now().UTC().Unix())*1000 + uint64(index),
@@ -147,6 +150,114 @@ func newDumbBlock() *block.Block {
 	}
 }
 
+func TestExportChain(t *testing.T) {
+	const single = false
+	const base = "/home/dzeta/repo/neo-bench/.docker/ir/"
+	cfgPath := base + "go.protocol.privnet.one.yml"
+	if single {
+		cfgPath = base + "go.protocol.privnet.single.yml"
+	}
+	cfg, err := config.Load(cfgPath, netmode.PrivNet)
+	require.NoError(t, err)
+
+	bc, err := NewBlockchain(storage.NewMemoryStore(), cfg.ProtocolConfiguration, zaptest.NewLogger(t))
+	require.NoError(t, err)
+	go bc.Run()
+	defer bc.Close()
+
+	fromAddr := testchain.MultisigScriptHash()
+	signFunc := signTx
+	signBlock := func(b *block.Block) {
+		data := b.GetSignedPart()
+		b.Script.InvocationScript = testchain.Sign(data)
+		b.Script.VerificationScript = testchain.MultisigVerificationScript()
+	}
+	if single {
+		const wifFrom = "KxyjQ8eUa4FHt3Gvioyt1Wz29cTUrE4eTqX3yFSk1YFCsPL8uNsY"
+		acc, err := wallet.NewAccountFromWIF(wifFrom)
+		require.NoError(t, err)
+		require.NoError(t, acc.ConvertMultisig(1, []*keys.PublicKey{acc.PrivateKey().PublicKey()}))
+
+		fromAddr = acc.Contract.ScriptHash()
+		signFunc = func(bc *Blockchain, txs ...*transaction.Transaction) error {
+			for i := range txs {
+				err := acc.SignTx(txs[i])
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		signBlock = func(b *block.Block) {
+			data := b.GetSignedPart()
+			sign := testchain.Sign(data)
+			b.Script.InvocationScript = append([]byte{byte(opcode.PUSHDATA1), 64}, sign...)
+			b.Script.VerificationScript = acc.Contract.Script
+		}
+	}
+
+	const wifTo = "KxhEDBQyyEFymvfJD96q8stMbJMbZUb6D1PmXqBWZDU2WvbvVs9o"
+	priv, err := keys.NewPrivateKeyFromWIF(wifTo)
+	require.NoError(t, err)
+
+	txMoveNeo := newNEP5Transfer(bc.contracts.NEO.Hash, fromAddr, priv.GetScriptHash(), native.NEOTotalSupply)
+	txMoveNeo.ValidUntilBlock = 2
+	txMoveNeo.Sender = fromAddr
+	txMoveNeo.Cosigners = []transaction.Cosigner{{
+		Account: fromAddr,
+		Scopes:  transaction.CalledByEntry,
+	}}
+	txMoveNeo.NetworkFee = 274000
+	require.NoError(t, signFunc(bc, txMoveNeo))
+
+	txMoveGas := newNEP5Transfer(bc.contracts.GAS.Hash, fromAddr, priv.GetScriptHash(), native.GASFactor*30000000)
+	txMoveGas.ValidUntilBlock = 2
+	txMoveGas.Sender = fromAddr
+	txMoveGas.Cosigners = []transaction.Cosigner{{
+		Account: fromAddr,
+		Scopes:  transaction.CalledByEntry,
+	}}
+	txMoveGas.NetworkFee = 274000
+	require.NoError(t, signFunc(bc, txMoveGas))
+
+	b := bc.newBlock(txMoveNeo, txMoveGas)
+	signBlock(b)
+	require.NoError(t, bc.AddBlock(b))
+	require.NoError(t, bc.persist())
+
+	b = bc.newBlock()
+	signBlock(b)
+	require.NoError(t, bc.AddBlock(b))
+	require.NoError(t, bc.persist())
+
+	fmt.Println(bc.GetUtilityTokenBalance(priv.GetScriptHash()))
+
+	name := "dump.acc"
+	if single {
+		name = "single.acc"
+	}
+	outStream, err := os.Create(name)
+	require.NoError(t, err)
+	defer outStream.Close()
+
+	writer := io.NewBinWriterFromIO(outStream)
+
+	count := bc.BlockHeight() + 1
+	writer.WriteU32LE(count)
+
+	for i := 0; i < int(count); i++ {
+		fmt.Println(i)
+		bh := bc.GetHeaderHash(i)
+		b, err := bc.GetBlock(bh)
+		require.NoError(t, err)
+		bytes, err := testserdes.EncodeBinary(b)
+		require.NoError(t, err)
+		writer.WriteU32LE(uint32(len(bytes)))
+		writer.WriteBytes(bytes)
+		require.NoError(t, writer.Err)
+	}
+}
+
 // This function generates "../rpc/testdata/testblocks.acc" file which contains data
 // for RPC unit tests. It also is a nice integration test.
 // To generate new "../rpc/testdata/testblocks.acc", follow the steps:
@@ -193,6 +304,7 @@ func TestCreateBasicChain(t *testing.T) {
 		AllowedContracts: nil,
 		AllowedGroups:    nil,
 	}}
+	spew.Dump(txMoveNeo)
 	require.NoError(t, signTx(bc, txMoveNeo))
 	// Move some GAS to one simple account.
 	txMoveGas := newNEP5Transfer(gasHash, neoOwner, priv0ScriptHash, int64(util.Fixed8FromInt64(1000)))
@@ -377,7 +489,7 @@ func newNEP5Transfer(sc, from, to util.Uint160, amount int64) *transaction.Trans
 	emit.Opcode(w.BinWriter, opcode.ASSERT)
 
 	script := w.Bytes()
-	return transaction.New(testchain.Network(), script, 0)
+	return transaction.New(netmode.PrivNet, script, 0)
 }
 
 func addSender(txs ...*transaction.Transaction) error {

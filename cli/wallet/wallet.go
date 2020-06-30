@@ -256,7 +256,7 @@ func convertWallet(ctx *cli.Context) error {
 		if err != nil {
 			return cli.NewExitError(err, -1)
 		} else if err := acc.Decrypt(pass); err != nil {
-			return cli.NewExitError("invalid passphrase", -1)
+			return cli.NewExitError(fmt.Errorf("invalid passphrase: %v", err), -1)
 		}
 
 		address.Prefix = address.NEO3Prefix
