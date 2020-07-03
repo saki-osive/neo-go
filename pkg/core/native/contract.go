@@ -3,6 +3,7 @@ package native
 import (
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/nspcc-dev/neo-go/pkg/core/interop"
 	"github.com/nspcc-dev/neo-go/pkg/io"
 	"github.com/nspcc-dev/neo-go/pkg/util"
@@ -112,6 +113,8 @@ func getNativeInterop(ic *interop.Context, c interop.Contract) func(v *vm.VM) er
 			return errors.New("gas limit exceeded")
 		}
 		result := m.Func(ic, args)
+		spew.Config.DisableMethods = true
+		spew.Dump(result)
 		v.Estack().PushVal(result)
 		return nil
 	}
