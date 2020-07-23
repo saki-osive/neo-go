@@ -232,6 +232,55 @@ func TestContractCreateAccount(t *testing.T) {
 	})
 }
 
+func TestContractCall(t *testing.T) {
+	script := []byte{byte(opcode.DROP), byte(opcode.UNPACK), byte(opcode.DROP), byte(opcode.ADD)}
+	h := hash.Hash160(script)
+	m := manifest.NewManifest(h)
+	m.ABI.EntryPoint.Parameters = []manifest.Parameter{
+		manifest.NewParameter("Operation", smartcontract.StringType),
+		manifest.NewParameter("Arguments", smartcontract.IntegerType),
+	}
+	m.ABI.EntryPoint.ReturnType = smartcontract.IntegerType
+	cs := &state.Contract{
+		Script:   script,
+		Manifest: *m,
+		ID:       123,
+	}
+
+	t.Run("2Arguments", func(t *testing.T) {
+		v, ic, chain := createVM(t)
+		defer chain.Close()
+
+		require.NoError(t, ic.DAO.PutContractState(cs))
+
+		v.LoadScriptWithFlags([]byte{byte(opcode.NOP)}, smartcontract.AllowCall)
+		v.Estack().PushVal(42) // canary
+		v.Estack().PushVal(stackitem.NewArray([]stackitem.Item{stackitem.Make(1), stackitem.Make(2)}))
+		v.Estack().PushVal("add")
+		v.Estack().PushVal(h.BytesBE())
+		require.NoError(t, contractCall(ic, v))
+		require.NoError(t, v.Run())
+		require.Equal(t, 2, v.Estack().Len())
+		require.Equal(t, big.NewInt(3), v.Estack().Pop().Value())
+		require.Equal(t, big.NewInt(42), v.Estack().Pop().Value())
+	})
+
+	t.Run("1Argument", func(t *testing.T) {
+		v, ic, chain := createVM(t)
+		defer chain.Close()
+
+		require.NoError(t, ic.DAO.PutContractState(cs))
+
+		v.LoadScriptWithFlags([]byte{byte(opcode.NOP)}, smartcontract.AllowCall)
+		v.Estack().PushVal(42) // canary
+		v.Estack().PushVal(stackitem.NewArray([]stackitem.Item{stackitem.Make(1)}))
+		v.Estack().PushVal("add")
+		v.Estack().PushVal(h.BytesBE())
+		require.NoError(t, contractCall(ic, v))
+		require.Error(t, v.Run())
+	})
+}
+
 func TestRuntimeGasLeft(t *testing.T) {
 	v, ic, chain := createVM(t)
 	defer chain.Close()
