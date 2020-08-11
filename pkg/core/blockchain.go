@@ -1181,6 +1181,12 @@ func (bc *Blockchain) ApplyPolicyToTxSet(txes []*transaction.Transaction) []*tra
 		blockSize += uint32(io.GetVarSize(tx))
 		sysFee += tx.SystemFee
 		if blockSize > maxBlockSize || sysFee > maxBlockSysFee {
+			bc.log.Info("policy",
+				zap.Uint32("block size", blockSize),
+				zap.Uint32("max block size", maxBlockSize),
+				zap.Int64("sys fee", sysFee),
+				zap.Int64("max sys fee", maxBlockSysFee),
+			)
 			txes = txes[:i]
 			break
 		}

@@ -7,8 +7,8 @@ ProtocolConfiguration:
   ValidatorsCount: 1
   SeedList:
     - 172.200.0.1:20333
-  VerifyBlocks: true
-  VerifyTransactions: true
+  VerifyBlocks: false
+  VerifyTransactions: false
 
 ApplicationConfiguration:
   # LogPath could be set up in case you need stdout logs to some proper file.
