@@ -520,9 +520,9 @@ func (s *Server) getApplicationLog(reqParams request.Params) (interface{}, *resp
 }
 
 func (s *Server) getNEP5Balances(ps request.Params) (interface{}, *response.Error) {
-	u, err := ps.Value(0).GetUint160FromAddressOrHex()
-	if err != nil {
-		return nil, response.ErrInvalidParams
+	u, responseErr := s.contractScriptHashFromParam(ps.Value(0))
+	if responseErr != nil {
+		return nil, responseErr
 	}
 
 	as := s.chain.GetNEP5Balances(u)
@@ -599,9 +599,9 @@ func getTimestampsAndLimit(ps request.Params, index int) (uint64, uint64, int, i
 }
 
 func (s *Server) getNEP5Transfers(ps request.Params) (interface{}, *response.Error) {
-	u, err := ps.Value(0).GetUint160FromAddressOrHex()
-	if err != nil {
-		return nil, response.ErrInvalidParams
+	u, responseErr := s.contractScriptHashFromParam(ps.Value(0))
+	if responseErr != nil {
+		return nil, responseErr
 	}
 
 	start, end, limit, page, err := getTimestampsAndLimit(ps, 1)
@@ -925,9 +925,9 @@ func (s *Server) getBlockHeader(reqParams request.Params) (interface{}, *respons
 
 // getUnclaimedGas returns unclaimed GAS amount of the specified address.
 func (s *Server) getUnclaimedGas(ps request.Params) (interface{}, *response.Error) {
-	u, err := ps.ValueWithType(0, request.StringT).GetUint160FromAddress()
-	if err != nil {
-		return nil, response.ErrInvalidParams
+	u, responseErr := s.contractScriptHashFromParam(ps.Value(0))
+	if responseErr != nil {
+		return nil, responseErr
 	}
 
 	neo, neoHeight := s.chain.GetGoverningTokenBalance(u)
@@ -977,9 +977,9 @@ func (s *Server) getCommittee(_ request.Params) (interface{}, *response.Error) {
 
 // invokeFunction implements the `invokeFunction` RPC call.
 func (s *Server) invokeFunction(reqParams request.Params) (interface{}, *response.Error) {
-	scriptHash, err := reqParams.ValueWithType(0, request.StringT).GetUint160FromHex()
-	if err != nil {
-		return nil, response.ErrInvalidParams
+	scriptHash, responseErr := s.contractScriptHashFromParam(reqParams.Value(0))
+	if responseErr != nil {
+		return nil, responseErr
 	}
 	tx := &transaction.Transaction{}
 	checkWitnessHashesIndex := len(reqParams)
