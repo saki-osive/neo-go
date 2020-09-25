@@ -33,6 +33,16 @@ func (cs *Contracts) ByHash(h util.Uint160) interop.Contract {
 	return nil
 }
 
+// ByName returns native contract with the specified name.
+func (cs *Contracts) ByName(name string) interop.Contract {
+	for _, ctr := range cs.Contracts {
+		if ctr.Metadata().Name == name {
+			return ctr
+		}
+	}
+	return nil
+}
+
 // NewContracts returns new set of native contracts with new GAS, NEO and Policy
 // contracts.
 func NewContracts() *Contracts {
