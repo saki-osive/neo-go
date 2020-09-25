@@ -14,6 +14,7 @@ import (
 	"github.com/nspcc-dev/neo-go/pkg/config/netmode"
 	"github.com/nspcc-dev/neo-go/pkg/rpc/request"
 	"github.com/nspcc-dev/neo-go/pkg/rpc/response"
+	"github.com/nspcc-dev/neo-go/pkg/util"
 )
 
 const (
@@ -52,6 +53,8 @@ type Options struct {
 // cache stores cache values for the RPC client methods
 type cache struct {
 	calculateValidUntilBlock calculateValidUntilBlockCache
+	neoContractHash          util.Uint160
+	gasContractHash          util.Uint160
 }
 
 // calculateValidUntilBlockCache stores cached number of validators and

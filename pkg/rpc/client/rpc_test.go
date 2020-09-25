@@ -315,13 +315,57 @@ var rpcClientTestCases = map[string][]rpcClientTestCase{
 	},
 	"getcontractstate": {
 		{
-			name: "positive",
+			name: "positive, by hash",
 			invoke: func(c *Client) (interface{}, error) {
 				hash, err := util.Uint160DecodeStringLE("1b4357bff5a01bdf2a6581247cf9ed1e24629176")
 				if err != nil {
 					panic(err)
 				}
-				return c.GetContractState(hash)
+				return c.GetContractStateByHash(hash)
+			},
+			serverResponse: `{"id":1,"jsonrpc":"2.0","result":{"id":0,"script":"VgJXHwIMDWNvbnRyYWN0IGNhbGx4eVMTwEEFB5IWIXhKDANQdXSXJyQAAAAQVUGEGNYNIXJqeRDOeRHOU0FSoUH1IUURQCOPAgAASgwLdG90YWxTdXBwbHmXJxEAAABFAkBCDwBAI28CAABKDAhkZWNpbWFsc5cnDQAAAEUSQCNWAgAASgwEbmFtZZcnEgAAAEUMBFJ1YmxAIzwCAABKDAZzeW1ib2yXJxEAAABFDANSVUJAIyECAABKDAliYWxhbmNlT2aXJ2IAAAAQVUGEGNYNIXN5EM50bMoAFLQnIwAAAAwPaW52YWxpZCBhZGRyZXNzEVVBNtNSBiFFENsgQGtsUEEfLnsHIXUMCWJhbGFuY2VPZmxtUxPAQQUHkhYhRW1AI7IBAABKDAh0cmFuc2ZlcpcnKwEAABBVQYQY1g0hdnkQzncHbwfKABS0JyoAAAAMFmludmFsaWQgJ2Zyb20nIGFkZHJlc3MRVUE201IGIUUQ2yBAeRHOdwhvCMoAFLQnKAAAAAwUaW52YWxpZCAndG8nIGFkZHJlc3MRVUE201IGIUUQ2yBAeRLOdwlvCRC1JyIAAAAMDmludmFsaWQgYW1vdW50EVVBNtNSBiFFENsgQG5vB1BBHy57ByF3Cm8Kbwm1JyYAAAAMEmluc3VmZmljaWVudCBmdW5kcxFVQTbTUgYhRRDbIEBvCm8Jn3cKbm8HbwpTQVKhQfUhbm8IUEEfLnsHIXcLbwtvCZ53C25vCG8LU0FSoUH1IQwIdHJhbnNmZXJvB28IbwlUFMBBBQeSFiFFEUAjewAAAEoMBGluaXSXJ1AAAAAQVUGEGNYNIXcMEFVBh8PSZCF3DQJAQg8Adw5vDG8Nbw5TQVKhQfUhDAh0cmFuc2ZlcgwA2zBvDW8OVBTAQQUHkhYhRRFAIyMAAAAMEWludmFsaWQgb3BlcmF0aW9uQTbTUgY6IwUAAABFQA==","manifest":{"abi":{"hash":"0x1b4357bff5a01bdf2a6581247cf9ed1e24629176","methods":[],"events":[]},"groups":[],"features":{"payable":false,"storage":true},"permissions":null,"trusts":[],"supportedstandards":[],"safemethods":[],"extra":null},"hash":"0x1b4357bff5a01bdf2a6581247cf9ed1e24629176"}}`,
+			result: func(c *Client) interface{} {
+				script, err := base64.StdEncoding.DecodeString("VgJXHwIMDWNvbnRyYWN0IGNhbGx4eVMTwEEFB5IWIXhKDANQdXSXJyQAAAAQVUGEGNYNIXJqeRDOeRHOU0FSoUH1IUURQCOPAgAASgwLdG90YWxTdXBwbHmXJxEAAABFAkBCDwBAI28CAABKDAhkZWNpbWFsc5cnDQAAAEUSQCNWAgAASgwEbmFtZZcnEgAAAEUMBFJ1YmxAIzwCAABKDAZzeW1ib2yXJxEAAABFDANSVUJAIyECAABKDAliYWxhbmNlT2aXJ2IAAAAQVUGEGNYNIXN5EM50bMoAFLQnIwAAAAwPaW52YWxpZCBhZGRyZXNzEVVBNtNSBiFFENsgQGtsUEEfLnsHIXUMCWJhbGFuY2VPZmxtUxPAQQUHkhYhRW1AI7IBAABKDAh0cmFuc2ZlcpcnKwEAABBVQYQY1g0hdnkQzncHbwfKABS0JyoAAAAMFmludmFsaWQgJ2Zyb20nIGFkZHJlc3MRVUE201IGIUUQ2yBAeRHOdwhvCMoAFLQnKAAAAAwUaW52YWxpZCAndG8nIGFkZHJlc3MRVUE201IGIUUQ2yBAeRLOdwlvCRC1JyIAAAAMDmludmFsaWQgYW1vdW50EVVBNtNSBiFFENsgQG5vB1BBHy57ByF3Cm8Kbwm1JyYAAAAMEmluc3VmZmljaWVudCBmdW5kcxFVQTbTUgYhRRDbIEBvCm8Jn3cKbm8HbwpTQVKhQfUhbm8IUEEfLnsHIXcLbwtvCZ53C25vCG8LU0FSoUH1IQwIdHJhbnNmZXJvB28IbwlUFMBBBQeSFiFFEUAjewAAAEoMBGluaXSXJ1AAAAAQVUGEGNYNIXcMEFVBh8PSZCF3DQJAQg8Adw5vDG8Nbw5TQVKhQfUhDAh0cmFuc2ZlcgwA2zBvDW8OVBTAQQUHkhYhRRFAIyMAAAAMEWludmFsaWQgb3BlcmF0aW9uQTbTUgY6IwUAAABFQA==")
+				if err != nil {
+					panic(err)
+				}
+				m := manifest.NewManifest(hash.Hash160(script))
+				m.Features = smartcontract.HasStorage
+				cs := &state.Contract{
+					ID:       0,
+					Script:   script,
+					Manifest: *m,
+				}
+				_ = cs.ScriptHash()
+				return cs
+			},
+		},
+		{
+			name: "positive, by address",
+			invoke: func(c *Client) (interface{}, error) {
+				return c.GetContractStateByAddressOrName("NWiu5oejTu925aeL9Hc1LX8SvaJhE23h15")
+			},
+			serverResponse: `{"id":1,"jsonrpc":"2.0","result":{"id":0,"script":"VgJXHwIMDWNvbnRyYWN0IGNhbGx4eVMTwEEFB5IWIXhKDANQdXSXJyQAAAAQVUGEGNYNIXJqeRDOeRHOU0FSoUH1IUURQCOPAgAASgwLdG90YWxTdXBwbHmXJxEAAABFAkBCDwBAI28CAABKDAhkZWNpbWFsc5cnDQAAAEUSQCNWAgAASgwEbmFtZZcnEgAAAEUMBFJ1YmxAIzwCAABKDAZzeW1ib2yXJxEAAABFDANSVUJAIyECAABKDAliYWxhbmNlT2aXJ2IAAAAQVUGEGNYNIXN5EM50bMoAFLQnIwAAAAwPaW52YWxpZCBhZGRyZXNzEVVBNtNSBiFFENsgQGtsUEEfLnsHIXUMCWJhbGFuY2VPZmxtUxPAQQUHkhYhRW1AI7IBAABKDAh0cmFuc2ZlcpcnKwEAABBVQYQY1g0hdnkQzncHbwfKABS0JyoAAAAMFmludmFsaWQgJ2Zyb20nIGFkZHJlc3MRVUE201IGIUUQ2yBAeRHOdwhvCMoAFLQnKAAAAAwUaW52YWxpZCAndG8nIGFkZHJlc3MRVUE201IGIUUQ2yBAeRLOdwlvCRC1JyIAAAAMDmludmFsaWQgYW1vdW50EVVBNtNSBiFFENsgQG5vB1BBHy57ByF3Cm8Kbwm1JyYAAAAMEmluc3VmZmljaWVudCBmdW5kcxFVQTbTUgYhRRDbIEBvCm8Jn3cKbm8HbwpTQVKhQfUhbm8IUEEfLnsHIXcLbwtvCZ53C25vCG8LU0FSoUH1IQwIdHJhbnNmZXJvB28IbwlUFMBBBQeSFiFFEUAjewAAAEoMBGluaXSXJ1AAAAAQVUGEGNYNIXcMEFVBh8PSZCF3DQJAQg8Adw5vDG8Nbw5TQVKhQfUhDAh0cmFuc2ZlcgwA2zBvDW8OVBTAQQUHkhYhRRFAIyMAAAAMEWludmFsaWQgb3BlcmF0aW9uQTbTUgY6IwUAAABFQA==","manifest":{"abi":{"hash":"0x1b4357bff5a01bdf2a6581247cf9ed1e24629176","methods":[],"events":[]},"groups":[],"features":{"payable":false,"storage":true},"permissions":null,"trusts":[],"supportedstandards":[],"safemethods":[],"extra":null},"hash":"0x1b4357bff5a01bdf2a6581247cf9ed1e24629176"}}`,
+			result: func(c *Client) interface{} {
+				script, err := base64.StdEncoding.DecodeString("VgJXHwIMDWNvbnRyYWN0IGNhbGx4eVMTwEEFB5IWIXhKDANQdXSXJyQAAAAQVUGEGNYNIXJqeRDOeRHOU0FSoUH1IUURQCOPAgAASgwLdG90YWxTdXBwbHmXJxEAAABFAkBCDwBAI28CAABKDAhkZWNpbWFsc5cnDQAAAEUSQCNWAgAASgwEbmFtZZcnEgAAAEUMBFJ1YmxAIzwCAABKDAZzeW1ib2yXJxEAAABFDANSVUJAIyECAABKDAliYWxhbmNlT2aXJ2IAAAAQVUGEGNYNIXN5EM50bMoAFLQnIwAAAAwPaW52YWxpZCBhZGRyZXNzEVVBNtNSBiFFENsgQGtsUEEfLnsHIXUMCWJhbGFuY2VPZmxtUxPAQQUHkhYhRW1AI7IBAABKDAh0cmFuc2ZlcpcnKwEAABBVQYQY1g0hdnkQzncHbwfKABS0JyoAAAAMFmludmFsaWQgJ2Zyb20nIGFkZHJlc3MRVUE201IGIUUQ2yBAeRHOdwhvCMoAFLQnKAAAAAwUaW52YWxpZCAndG8nIGFkZHJlc3MRVUE201IGIUUQ2yBAeRLOdwlvCRC1JyIAAAAMDmludmFsaWQgYW1vdW50EVVBNtNSBiFFENsgQG5vB1BBHy57ByF3Cm8Kbwm1JyYAAAAMEmluc3VmZmljaWVudCBmdW5kcxFVQTbTUgYhRRDbIEBvCm8Jn3cKbm8HbwpTQVKhQfUhbm8IUEEfLnsHIXcLbwtvCZ53C25vCG8LU0FSoUH1IQwIdHJhbnNmZXJvB28IbwlUFMBBBQeSFiFFEUAjewAAAEoMBGluaXSXJ1AAAAAQVUGEGNYNIXcMEFVBh8PSZCF3DQJAQg8Adw5vDG8Nbw5TQVKhQfUhDAh0cmFuc2ZlcgwA2zBvDW8OVBTAQQUHkhYhRRFAIyMAAAAMEWludmFsaWQgb3BlcmF0aW9uQTbTUgY6IwUAAABFQA==")
+				if err != nil {
+					panic(err)
+				}
+				m := manifest.NewManifest(hash.Hash160(script))
+				m.Features = smartcontract.HasStorage
+				cs := &state.Contract{
+					ID:       0,
+					Script:   script,
+					Manifest: *m,
+				}
+				_ = cs.ScriptHash()
+				return cs
+			},
+		},
+		{
+			name: "positive, by id",
+			invoke: func(c *Client) (interface{}, error) {
+				return c.GetContractStateByID(0)
 			},
 			serverResponse: `{"id":1,"jsonrpc":"2.0","result":{"id":0,"script":"VgJXHwIMDWNvbnRyYWN0IGNhbGx4eVMTwEEFB5IWIXhKDANQdXSXJyQAAAAQVUGEGNYNIXJqeRDOeRHOU0FSoUH1IUURQCOPAgAASgwLdG90YWxTdXBwbHmXJxEAAABFAkBCDwBAI28CAABKDAhkZWNpbWFsc5cnDQAAAEUSQCNWAgAASgwEbmFtZZcnEgAAAEUMBFJ1YmxAIzwCAABKDAZzeW1ib2yXJxEAAABFDANSVUJAIyECAABKDAliYWxhbmNlT2aXJ2IAAAAQVUGEGNYNIXN5EM50bMoAFLQnIwAAAAwPaW52YWxpZCBhZGRyZXNzEVVBNtNSBiFFENsgQGtsUEEfLnsHIXUMCWJhbGFuY2VPZmxtUxPAQQUHkhYhRW1AI7IBAABKDAh0cmFuc2ZlcpcnKwEAABBVQYQY1g0hdnkQzncHbwfKABS0JyoAAAAMFmludmFsaWQgJ2Zyb20nIGFkZHJlc3MRVUE201IGIUUQ2yBAeRHOdwhvCMoAFLQnKAAAAAwUaW52YWxpZCAndG8nIGFkZHJlc3MRVUE201IGIUUQ2yBAeRLOdwlvCRC1JyIAAAAMDmludmFsaWQgYW1vdW50EVVBNtNSBiFFENsgQG5vB1BBHy57ByF3Cm8Kbwm1JyYAAAAMEmluc3VmZmljaWVudCBmdW5kcxFVQTbTUgYhRRDbIEBvCm8Jn3cKbm8HbwpTQVKhQfUhbm8IUEEfLnsHIXcLbwtvCZ53C25vCG8LU0FSoUH1IQwIdHJhbnNmZXJvB28IbwlUFMBBBQeSFiFFEUAjewAAAEoMBGluaXSXJ1AAAAAQVUGEGNYNIXcMEFVBh8PSZCF3DQJAQg8Adw5vDG8Nbw5TQVKhQfUhDAh0cmFuc2ZlcgwA2zBvDW8OVBTAQQUHkhYhRRFAIyMAAAAMEWludmFsaWQgb3BlcmF0aW9uQTbTUgY6IwUAAABFQA==","manifest":{"abi":{"hash":"0x1b4357bff5a01bdf2a6581247cf9ed1e24629176","methods":[],"events":[]},"groups":[],"features":{"payable":false,"storage":true},"permissions":null,"trusts":[],"supportedstandards":[],"safemethods":[],"extra":null},"hash":"0x1b4357bff5a01bdf2a6581247cf9ed1e24629176"}}`,
 			result: func(c *Client) interface{} {
@@ -593,9 +637,30 @@ var rpcClientTestCases = map[string][]rpcClientTestCase{
 	},
 	"getunclaimedgas": {
 		{
-			name: "positive",
+			name: "positive, by address",
 			invoke: func(c *Client) (interface{}, error) {
-				return c.GetUnclaimedGas("NMipL5VsNoLUBUJKPKLhxaEbPQVCZnyJyB")
+				return c.GetUnclaimedGasByAddress("NMipL5VsNoLUBUJKPKLhxaEbPQVCZnyJyB")
+			},
+			serverResponse: `{"jsonrpc":"2.0","id":1,"result":{"address":"NMipL5VsNoLUBUJKPKLhxaEbPQVCZnyJyB","unclaimed":"897299680935"}}`,
+			result: func(c *Client) interface{} {
+				addr, err := address.StringToUint160("NMipL5VsNoLUBUJKPKLhxaEbPQVCZnyJyB")
+				if err != nil {
+					panic(fmt.Errorf("failed to parse UnclaimedGas address: %w", err))
+				}
+				return result.UnclaimedGas{
+					Address:   addr,
+					Unclaimed: *big.NewInt(897299680935),
+				}
+			},
+		},
+		{
+			name: "positive, by scripthash",
+			invoke: func(c *Client) (interface{}, error) {
+				hash, err := util.Uint160DecodeStringLE("f0a33acbf435417f3d2c18445d607d1e6f48d413")
+				if err != nil {
+					panic(err)
+				}
+				return c.GetUnclaimedGasByScriptHash(hash)
 			},
 			serverResponse: `{"jsonrpc":"2.0","id":1,"result":{"address":"NMipL5VsNoLUBUJKPKLhxaEbPQVCZnyJyB","unclaimed":"897299680935"}}`,
 			result: func(c *Client) interface{} {
@@ -644,7 +709,7 @@ var rpcClientTestCases = map[string][]rpcClientTestCase{
 	},
 	"invokefunction": {
 		{
-			name: "positive",
+			name: "positive, by scripthash",
 			invoke: func(c *Client) (interface{}, error) {
 				hash, err := util.Uint160DecodeStringLE("91b83e96f2a7c4fdf0c1688441ec61986c7cae26")
 				if err != nil {
@@ -654,7 +719,67 @@ var rpcClientTestCases = map[string][]rpcClientTestCase{
 				if err != nil {
 					panic(err)
 				}
-				return c.InvokeFunction(contr, "balanceOf", []smartcontract.Parameter{
+				return c.InvokeFunctionByScriptHash(contr, "balanceOf", []smartcontract.Parameter{
+					{
+						Type:  smartcontract.Hash160Type,
+						Value: hash,
+					},
+				}, []transaction.Signer{{
+					Account: util.Uint160{1, 2, 3},
+				}})
+			},
+			serverResponse: `{"jsonrpc":"2.0","id":1,"result":{"script":"1426ae7c6c9861ec418468c1f0fdc4a7f2963eb89151c10962616c616e63654f6667be39e7b562f60cbfe2aebca375a2e5ee28737caf","state":"HALT","gasconsumed":"31100000","stack":[{"type":"ByteString","value":"JivsCEQy"}],"tx":"d101361426ae7c6c9861ec418468c1f0fdc4a7f2963eb89151c10962616c616e63654f6667be39e7b562f60cbfe2aebca375a2e5ee28737caf000000000000000000000000"}}`,
+			result: func(c *Client) interface{} {
+				bytes, err := hex.DecodeString("262bec084432")
+				if err != nil {
+					panic(err)
+				}
+				return &result.Invoke{
+					State:       "HALT",
+					GasConsumed: 31100000,
+					Script:      "1426ae7c6c9861ec418468c1f0fdc4a7f2963eb89151c10962616c616e63654f6667be39e7b562f60cbfe2aebca375a2e5ee28737caf",
+					Stack:       []stackitem.Item{stackitem.NewByteArray(bytes)},
+				}
+			},
+		},
+		{
+			name: "positive, by ID",
+			invoke: func(c *Client) (interface{}, error) {
+				hash, err := util.Uint160DecodeStringLE("91b83e96f2a7c4fdf0c1688441ec61986c7cae26")
+				if err != nil {
+					panic(err)
+				}
+				return c.InvokeFunctionByID(0, "balanceOf", []smartcontract.Parameter{
+					{
+						Type:  smartcontract.Hash160Type,
+						Value: hash,
+					},
+				}, []transaction.Signer{{
+					Account: util.Uint160{1, 2, 3},
+				}})
+			},
+			serverResponse: `{"jsonrpc":"2.0","id":1,"result":{"script":"1426ae7c6c9861ec418468c1f0fdc4a7f2963eb89151c10962616c616e63654f6667be39e7b562f60cbfe2aebca375a2e5ee28737caf","state":"HALT","gasconsumed":"31100000","stack":[{"type":"ByteString","value":"JivsCEQy"}],"tx":"d101361426ae7c6c9861ec418468c1f0fdc4a7f2963eb89151c10962616c616e63654f6667be39e7b562f60cbfe2aebca375a2e5ee28737caf000000000000000000000000"}}`,
+			result: func(c *Client) interface{} {
+				bytes, err := hex.DecodeString("262bec084432")
+				if err != nil {
+					panic(err)
+				}
+				return &result.Invoke{
+					State:       "HALT",
+					GasConsumed: 31100000,
+					Script:      "1426ae7c6c9861ec418468c1f0fdc4a7f2963eb89151c10962616c616e63654f6667be39e7b562f60cbfe2aebca375a2e5ee28737caf",
+					Stack:       []stackitem.Item{stackitem.NewByteArray(bytes)},
+				}
+			},
+		},
+		{
+			name: "positive, by address",
+			invoke: func(c *Client) (interface{}, error) {
+				hash, err := util.Uint160DecodeStringLE("91b83e96f2a7c4fdf0c1688441ec61986c7cae26")
+				if err != nil {
+					panic(err)
+				}
+				return c.InvokeFunctionByAddressOrName("NWiu5oejTu925aeL9Hc1LX8SvaJhE23h15", "balanceOf", []smartcontract.Parameter{
 					{
 						Type:  smartcontract.Hash160Type,
 						Value: hash,
@@ -936,7 +1061,7 @@ var rpcClientErrorCases = map[string][]rpcClientErrorCase{
 		{
 			name: "getcontractstate_invalid_params_error",
 			invoke: func(c *Client) (interface{}, error) {
-				return c.GetContractState(util.Uint160{})
+				return c.GetContractStateByHash(util.Uint160{})
 			},
 		},
 		{
@@ -1007,13 +1132,13 @@ var rpcClientErrorCases = map[string][]rpcClientErrorCase{
 		{
 			name: "getunclaimedgas_invalid_params_error",
 			invoke: func(c *Client) (interface{}, error) {
-				return c.GetUnclaimedGas("")
+				return c.GetUnclaimedGasByAddress("")
 			},
 		},
 		{
 			name: "invokefunction_invalid_params_error",
 			invoke: func(c *Client) (interface{}, error) {
-				return c.InvokeFunction(util.Uint160{}, "", []smartcontract.Parameter{}, nil)
+				return c.InvokeFunctionByScriptHash(util.Uint160{}, "", []smartcontract.Parameter{}, nil)
 			},
 		},
 		{
@@ -1123,7 +1248,7 @@ var rpcClientErrorCases = map[string][]rpcClientErrorCase{
 		{
 			name: "getcontractstate_unmarshalling_error",
 			invoke: func(c *Client) (interface{}, error) {
-				return c.GetContractState(util.Uint160{})
+				return c.GetContractStateByHash(util.Uint160{})
 			},
 		},
 		{
@@ -1183,7 +1308,7 @@ var rpcClientErrorCases = map[string][]rpcClientErrorCase{
 		{
 			name: "getunclaimedgas_unmarshalling_error",
 			invoke: func(c *Client) (interface{}, error) {
-				return c.GetUnclaimedGas("")
+				return c.GetUnclaimedGasByAddress("")
 			},
 		},
 		{
@@ -1201,7 +1326,7 @@ var rpcClientErrorCases = map[string][]rpcClientErrorCase{
 		{
 			name: "invokefunction_unmarshalling_error",
 			invoke: func(c *Client) (interface{}, error) {
-				return c.InvokeFunction(util.Uint160{}, "", []smartcontract.Parameter{}, nil)
+				return c.InvokeFunctionByScriptHash(util.Uint160{}, "", []smartcontract.Parameter{}, nil)
 			},
 		},
 		{

@@ -192,12 +192,24 @@ func (c *Client) GetCommittee() (keys.PublicKeys, error) {
 	return *resp, nil
 }
 
-// GetContractState queries contract information, according to the contract script hash.
-func (c *Client) GetContractState(hash util.Uint160) (*state.Contract, error) {
-	var (
-		params = request.NewRawParams(hash.StringLE())
-		resp   = &state.Contract{}
-	)
+// GetContractStateByHash queries contract information, according to the contract script hash.
+func (c *Client) GetContractStateByHash(hash util.Uint160) (*state.Contract, error) {
+	return c.getContractState(request.NewRawParams(hash.StringLE()))
+}
+
+// GetContractStateByAddressOrName queries contract information, according to the contract address or name.
+func (c *Client) GetContractStateByAddressOrName(addressOrName string) (*state.Contract, error) {
+	return c.getContractState(request.NewRawParams(addressOrName))
+}
+
+// GetContractStateByID queries contract information, according to the contract ID.
+func (c *Client) GetContractStateByID(id int32) (*state.Contract, error) {
+	return c.getContractState(request.NewRawParams(id))
+}
+
+// getContractState is an internal representation of GetContractStateBy* methods.
+func (c *Client) getContractState(params request.RawParams) (*state.Contract, error) {
+	var resp = &state.Contract{}
 	if err := c.performRequest("getcontractstate", params, resp); err != nil {
 		return resp, err
 	}
@@ -341,12 +353,19 @@ func (c *Client) GetTransactionHeight(hash util.Uint256) (uint32, error) {
 	return resp, nil
 }
 
-// GetUnclaimedGas returns unclaimed GAS amount for the specified address.
-func (c *Client) GetUnclaimedGas(address string) (result.UnclaimedGas, error) {
-	var (
-		params = request.NewRawParams(address)
-		resp   result.UnclaimedGas
-	)
+// GetUnclaimedGasByScriptHash returns unclaimed GAS amount for the specified script hash.
+func (c *Client) GetUnclaimedGasByScriptHash(address util.Uint160) (result.UnclaimedGas, error) {
+	return c.getUnclaimedGas(request.NewRawParams(address.StringLE()))
+}
+
+// GetUnclaimedGasByAddress returns unclaimed GAS amount for the specified address.
+func (c *Client) GetUnclaimedGasByAddress(address string) (result.UnclaimedGas, error) {
+	return c.getUnclaimedGas(request.NewRawParams(address))
+}
+
+// getUnclaimedGas is an internal representation of the GetUnclaimedGas* methods
+func (c *Client) getUnclaimedGas(params request.RawParams) (result.UnclaimedGas, error) {
+	var resp result.UnclaimedGas
 	if err := c.performRequest("getunclaimedgas", params, &resp); err != nil {
 		return resp, err
 	}
@@ -384,11 +403,27 @@ func (c *Client) InvokeScript(script []byte, signers []transaction.Signer) (*res
 	return c.invokeSomething("invokescript", p, signers)
 }
 
-// InvokeFunction returns the results after calling the smart contract scripthash
+// InvokeFunctionByScriptHash returns the results after calling the smart contract scripthash
 // with the given operation and parameters.
 // NOTE: this is test invoke and will not affect the blockchain.
-func (c *Client) InvokeFunction(contract util.Uint160, operation string, params []smartcontract.Parameter, signers []transaction.Signer) (*result.Invoke, error) {
+func (c *Client) InvokeFunctionByScriptHash(contract util.Uint160, operation string, params []smartcontract.Parameter, signers []transaction.Signer) (*result.Invoke, error) {
 	var p = request.NewRawParams(contract.StringLE(), operation, params)
+	return c.invokeSomething("invokefunction", p, signers)
+}
+
+// InvokeFunctionByID returns the results after calling the smart contract by its ID
+// with the given operation and parameters.
+// NOTE: this is test invoke and will not affect the blockchain.
+func (c *Client) InvokeFunctionByID(contractID int32, operation string, params []smartcontract.Parameter, signers []transaction.Signer) (*result.Invoke, error) {
+	var p = request.NewRawParams(contractID, operation, params)
+	return c.invokeSomething("invokefunction", p, signers)
+}
+
+// InvokeFunctionByAddressOrName returns the results after calling the smart contract by its address or name
+// with the given operation and parameters.
+// NOTE: this is test invoke and will not affect the blockchain.
+func (c *Client) InvokeFunctionByAddressOrName(contractAddressOrName string, operation string, params []smartcontract.Parameter, signers []transaction.Signer) (*result.Invoke, error) {
+	var p = request.NewRawParams(contractAddressOrName, operation, params)
 	return c.invokeSomething("invokefunction", p, signers)
 }
 
@@ -536,7 +571,7 @@ func (c *Client) AddNetworkFee(tx *transaction.Transaction, extraFee int64, accs
 	size := io.GetVarSize(tx)
 	for i, cosigner := range tx.Signers {
 		if accs[i].Contract.Deployed {
-			res, err := c.InvokeFunction(cosigner.Account, manifest.MethodVerify, []smartcontract.Parameter{}, tx.Signers)
+			res, err := c.InvokeFunctionByScriptHash(cosigner.Account, manifest.MethodVerify, []smartcontract.Parameter{}, tx.Signers)
 			if err == nil && res.State == "HALT" && len(res.Stack) == 1 {
 				r, err := topIntFromStack(res.Stack)
 				if err != nil || r == 0 {
@@ -559,4 +594,28 @@ func (c *Client) AddNetworkFee(tx *transaction.Transaction, extraFee int64, accs
 	}
 	tx.NetworkFee += int64(size)*fee + extraFee
 	return nil
+}
+
+// GetNEOContractHash returns NEO native contract hash.
+func (c *Client) GetNEOContractHash() (util.Uint160, error) {
+	if c.cache.neoContractHash.Equals(util.Uint160{}) {
+		cs, err := c.GetContractStateByID(-1)
+		if err != nil {
+			return util.Uint160{}, err
+		}
+		c.cache.neoContractHash = cs.ScriptHash()
+	}
+	return c.cache.neoContractHash, nil
+}
+
+// GetGASContractHash returns GAS native contract hash.
+func (c *Client) GetGASContractHash() (util.Uint160, error) {
+	if c.cache.gasContractHash.Equals(util.Uint160{}) {
+		cs, err := c.GetContractStateByID(-2)
+		if err != nil {
+			return util.Uint160{}, err
+		}
+		c.cache.gasContractHash = cs.ScriptHash()
+	}
+	return c.cache.gasContractHash, nil
 }

@@ -21,11 +21,6 @@ import (
 const validUntilBlockIncrement = 50
 
 var (
-	neoToken = wallet.NewToken(client.NeoContractHash, "NEO", "neo", 0)
-	gasToken = wallet.NewToken(client.GasContractHash, "GAS", "gas", 8)
-)
-
-var (
 	tokenFlag = cli.StringFlag{
 		Name:  "token",
 		Usage: "Token to use",
@@ -74,6 +69,23 @@ func newNEP5Commands() []cli.Command {
 		gasFlag,
 	}
 	multiTransferFlags = append(multiTransferFlags, options.RPC...)
+	infoFlags := []cli.Flag{
+		walletPathFlag,
+		cli.StringFlag{
+			Name:  "token",
+			Usage: "Token name or hash",
+		},
+	}
+	infoFlags = append(infoFlags, options.RPC...)
+	removeFlags := []cli.Flag{
+		walletPathFlag,
+		cli.StringFlag{
+			Name:  "token",
+			Usage: "Token name or hash",
+		},
+		forceFlag,
+	}
+	removeFlags = append(removeFlags, options.RPC...)
 	return []cli.Command{
 		{
 			Name:      "balance",
@@ -92,29 +104,16 @@ func newNEP5Commands() []cli.Command {
 		{
 			Name:      "info",
 			Usage:     "print imported NEP5 token info",
-			UsageText: "print --wallet <path> [--token <hash-or-name>]",
+			UsageText: "print --wallet <path> --rpc-endpoint <node> --timeout <time> [--token <hash-or-name>]",
 			Action:    printNEP5Info,
-			Flags: []cli.Flag{
-				walletPathFlag,
-				cli.StringFlag{
-					Name:  "token",
-					Usage: "Token name or hash",
-				},
-			},
+			Flags:     infoFlags,
 		},
 		{
 			Name:      "remove",
 			Usage:     "remove NEP5 token from the wallet",
 			UsageText: "remove --wallet <path> --token <hash-or-name>",
 			Action:    removeNEP5Token,
-			Flags: []cli.Flag{
-				walletPathFlag,
-				cli.StringFlag{
-					Name:  "token",
-					Usage: "Token name or hash",
-				},
-				forceFlag,
-			},
+			Flags:     removeFlags,
 		},
 		{
 			Name:      "transfer",
@@ -162,7 +161,7 @@ func getNEP5Balance(ctx *cli.Context) error {
 	var token *wallet.Token
 	name := ctx.String("token")
 	if name != "" {
-		token, err = getMatchingToken(ctx, wall, name)
+		token, err = getMatchingToken(ctx, c, wall, name)
 		if err != nil {
 			token, err = getMatchingTokenRPC(ctx, c, addrHash, name)
 			if err != nil {
@@ -188,12 +187,20 @@ func getNEP5Balance(ctx *cli.Context) error {
 	return nil
 }
 
-func getMatchingToken(ctx *cli.Context, w *wallet.Wallet, name string) (*wallet.Token, error) {
+func getMatchingToken(ctx *cli.Context, c *client.Client, w *wallet.Wallet, name string) (*wallet.Token, error) {
 	switch strings.ToLower(name) {
 	case "neo":
-		return neoToken, nil
+		neoContractHash, err := c.GetNEOContractHash()
+		if err != nil {
+			return nil, err
+		}
+		return wallet.NewToken(neoContractHash, "NEO", "neo", 0), nil
 	case "gas":
-		return gasToken, nil
+		gasContractHash, err := c.GetGASContractHash()
+		if err != nil {
+			return nil, err
+		}
+		return wallet.NewToken(gasContractHash, "GAS", "gas", 8), nil
 	}
 	return getMatchingTokenAux(ctx, func(i int) *wallet.Token {
 		return w.Extra.Tokens[i]
@@ -289,8 +296,16 @@ func printNEP5Info(ctx *cli.Context) error {
 	}
 	defer wall.Close()
 
+	gctx, cancel := options.GetTimeoutContext(ctx)
+	defer cancel()
+
+	c, err := options.GetRPCClient(gctx, ctx)
+	if err != nil {
+		return err
+	}
+
 	if name := ctx.String("token"); name != "" {
-		token, err := getMatchingToken(ctx, wall, name)
+		token, err := getMatchingToken(ctx, c, wall, name)
 		if err != nil {
 			return cli.NewExitError(err, 1)
 		}
@@ -314,10 +329,19 @@ func removeNEP5Token(ctx *cli.Context) error {
 	}
 	defer wall.Close()
 
-	token, err := getMatchingToken(ctx, wall, ctx.String("token"))
+	gctx, cancel := options.GetTimeoutContext(ctx)
+	defer cancel()
+
+	c, err := options.GetRPCClient(gctx, ctx)
+	if err != nil {
+		return err
+	}
+
+	token, err := getMatchingToken(ctx, c, wall, ctx.String("token"))
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
+
 	if !ctx.Bool("force") {
 		if ok := askForConsent(ctx.App.Writer); !ok {
 			return nil
@@ -366,7 +390,7 @@ func multiTransferNEP5(ctx *cli.Context) error {
 		}
 		token, ok := cache[ss[0]]
 		if !ok {
-			token, err = getMatchingToken(ctx, wall, ss[0])
+			token, err = getMatchingToken(ctx, c, wall, ss[0])
 			if err != nil {
 				fmt.Fprintln(ctx.App.ErrWriter, "Can't find matching token in the wallet. Querying RPC-node for balances.")
 				token, err = getMatchingTokenRPC(ctx, c, from, ss[0])
@@ -418,7 +442,7 @@ func transferNEP5(ctx *cli.Context) error {
 
 	toFlag := ctx.Generic("to").(*flags.Address)
 	to := toFlag.Uint160()
-	token, err := getMatchingToken(ctx, wall, ctx.String("token"))
+	token, err := getMatchingToken(ctx, c, wall, ctx.String("token"))
 	if err != nil {
 		fmt.Fprintln(ctx.App.ErrWriter, "Can't find matching token in the wallet. Querying RPC-node for balances.")
 		token, err = getMatchingTokenRPC(ctx, c, from, ctx.String("token"))

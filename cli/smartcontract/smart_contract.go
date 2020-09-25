@@ -478,7 +478,7 @@ func invokeInternal(ctx *cli.Context, signAndPush bool) error {
 		return err
 	}
 
-	resp, err = c.InvokeFunction(script, operation, params, cosigners)
+	resp, err = c.InvokeFunctionByScriptHash(script, operation, params, cosigners)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
