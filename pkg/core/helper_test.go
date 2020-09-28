@@ -38,11 +38,15 @@ var neoOwner = testchain.MultisigScriptHash()
 // newTestChain should be called before newBlock invocation to properly setup
 // global state.
 func newTestChain(t *testing.T) *Blockchain {
+	chain := initTestChain(t)
+	go chain.Run()
+	return chain
+}
+func initTestChain(t *testing.T) *Blockchain {
 	unitTestNetCfg, err := config.Load("../../config", testchain.Network())
 	require.NoError(t, err)
 	chain, err := NewBlockchain(storage.NewMemoryStore(), unitTestNetCfg.ProtocolConfiguration, zaptest.NewLogger(t))
 	require.NoError(t, err)
-	go chain.Run()
 	return chain
 }
 

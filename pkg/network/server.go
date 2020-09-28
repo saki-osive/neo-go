@@ -15,9 +15,11 @@ import (
 	"github.com/nspcc-dev/neo-go/pkg/core"
 	"github.com/nspcc-dev/neo-go/pkg/core/block"
 	"github.com/nspcc-dev/neo-go/pkg/core/blockchainer"
+	"github.com/nspcc-dev/neo-go/pkg/core/native"
 	"github.com/nspcc-dev/neo-go/pkg/core/transaction"
 	"github.com/nspcc-dev/neo-go/pkg/network/capability"
 	"github.com/nspcc-dev/neo-go/pkg/network/payload"
+	"github.com/nspcc-dev/neo-go/pkg/oracle"
 	"github.com/nspcc-dev/neo-go/pkg/util"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
@@ -73,6 +75,8 @@ type (
 
 		consensusStarted *atomic.Bool
 
+		oracle *oracle.Oracle
+
 		log *zap.Logger
 	}
 
@@ -112,6 +116,30 @@ func NewServer(config ServerConfig, chain blockchainer.Blockchainer, log *zap.Lo
 			s.tryStartConsensus()
 		}
 	})
+
+	if config.OracleCfg.Enabled {
+		orcCfg := oracle.Config{
+			Log:          log,
+			Network:      config.Net,
+			MainCfg:      config.OracleCfg,
+			OracleScript: native.GetOracleInvokeScript(),
+			Chain:        chain,
+		}
+		orc, err := oracle.NewOracle(orcCfg)
+		if err != nil {
+			return nil, fmt.Errorf("can't initialize Oracle module: %w", err)
+		}
+		orc.SetOnTransaction(func(tx *transaction.Transaction) {
+			r := s.RelayTxn(tx)
+			if r != RelaySucceed {
+				orc.Log.Error("can't pool oracle tx",
+					zap.String("hash", tx.Hash().StringLE()),
+					zap.Uint8("reason", byte(r)))
+			}
+		})
+		s.oracle = orc
+		chain.SetOracle(orc)
+	}
 
 	srv, err := consensus.NewService(consensus.Config{
 		Logger:    log,
@@ -173,6 +201,9 @@ func (s *Server) Start(errChan chan error) {
 	s.tryStartConsensus()
 
 	go s.broadcastTxLoop()
+	if s.oracle != nil {
+		go s.oracle.Run()
+	}
 	go s.relayBlocksLoop()
 	go s.bQueue.run()
 	go s.transport.Accept()
@@ -192,7 +223,15 @@ func (s *Server) Shutdown() {
 		p.Disconnect(errServerShutdown)
 	}
 	s.bQueue.discard()
+	if s.oracle != nil {
+		s.oracle.Shutdown()
+	}
 	close(s.quit)
+}
+
+// GetOracle returns oracle module instance.
+func (s *Server) GetOracle() *oracle.Oracle {
+	return s.oracle
 }
 
 // UnconnectedPeers returns a list of peers that are in the discovery peer list
