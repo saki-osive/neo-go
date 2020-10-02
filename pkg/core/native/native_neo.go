@@ -204,6 +204,29 @@ func (n *NEO) Initialize(ic *interop.Context) error {
 	return nil
 }
 
+// initializeCache initializes all NEO cache with the proper values from storage.
+// Cache initialisation should be done apart from Initialize because Initialize is
+// called only when deploying native contracts.
+func (n *NEO) InitializeCache(bc blockchainer.Blockchainer, d dao.DAO) error {
+	committee := keys.PublicKeys{}
+	si := d.GetStorageItem(n.ContractID, prefixCommittee)
+	if err := committee.DecodeBytes(si.Value); err != nil {
+		return err
+	}
+	if err := n.updateCache(committee, bc); err != nil {
+		return err
+	}
+
+	var gr state.GASRecord
+	si = d.GetStorageItem(n.ContractID, []byte{prefixGASPerBlock})
+	if err := gr.FromBytes(si.Value); err != nil {
+		return err
+	}
+	n.gasPerBlock.Store(gr)
+	n.gasPerBlockChanged.Store(false)
+	return nil
+}
+
 func (n *NEO) updateCache(committee keys.PublicKeys, bc blockchainer.Blockchainer) error {
 	n.committee.Store(committee)
 	script, err := smartcontract.CreateMajorityMultiSigRedeemScript(committee.Copy())

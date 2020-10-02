@@ -253,6 +253,8 @@ func (bc *Blockchain) init() error {
 		}
 	}
 
+	bc.contracts.NEO.InitializeCache(bc, bc.dao)
+
 	return nil
 }
 
