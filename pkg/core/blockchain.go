@@ -27,6 +27,7 @@ import (
 	"github.com/nspcc-dev/neo-go/pkg/vm/emit"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // Tuning parameters.
@@ -123,7 +124,9 @@ type Blockchain struct {
 	// cache for block verification keys.
 	keyCache map[util.Uint160]map[string]*keys.PublicKey
 
-	log *zap.Logger
+	log               *zap.Logger
+	syscallsLog       *zap.Logger
+	usefulSyscallsLog *zap.Logger
 
 	lastBatch *storage.MemBatch
 
@@ -168,19 +171,49 @@ func NewBlockchain(s storage.Store, cfg config.ProtocolConfiguration, log *zap.L
 		cfg.FeePerExtraByte = 0
 		log.Info("FeePerExtraByte is not set or wrong, setting default value", zap.Float64("FeePerExtraByte", cfg.FeePerExtraByte))
 	}
+	cc := zap.NewProductionConfig()
+	cc.DisableCaller = true
+	cc.DisableStacktrace = true
+	cc.EncoderConfig.EncodeDuration = zapcore.StringDurationEncoder
+	cc.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+	cc.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	cc.Encoding = "console"
+	cc.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
+	cc.Sampling = nil
+	logPath := "./useful_logs"
+	if err := io.MakeDirForFile(logPath, "logger"); err != nil {
+		return nil, err
+	}
+	cc.OutputPaths = []string{logPath}
+	syscallsLogger, err := cc.Build()
+	if err != nil {
+		return nil, err
+	}
+	logPath = "./very_useful_logs"
+	if err := io.MakeDirForFile(logPath, "logger"); err != nil {
+		return nil, err
+	}
+	cc.OutputPaths = []string{logPath}
+	usefulSyscallsLogger, err := cc.Build()
+	if err != nil {
+		return nil, err
+	}
+
 	bc := &Blockchain{
-		config:        cfg,
-		dao:           dao.NewSimple(s),
-		headersOp:     make(chan headersOpFunc),
-		headersOpDone: make(chan struct{}),
-		stopCh:        make(chan struct{}),
-		runToExitCh:   make(chan struct{}),
-		memPool:       mempool.NewMemPool(cfg.MemPoolSize),
-		keyCache:      make(map[util.Uint160]map[string]*keys.PublicKey),
-		log:           log,
-		events:        make(chan bcEvent),
-		subCh:         make(chan interface{}),
-		unsubCh:       make(chan interface{}),
+		config:            cfg,
+		dao:               dao.NewSimple(s),
+		headersOp:         make(chan headersOpFunc),
+		headersOpDone:     make(chan struct{}),
+		stopCh:            make(chan struct{}),
+		runToExitCh:       make(chan struct{}),
+		memPool:           mempool.NewMemPool(cfg.MemPoolSize),
+		keyCache:          make(map[util.Uint160]map[string]*keys.PublicKey),
+		log:               log,
+		syscallsLog:       syscallsLogger,
+		usefulSyscallsLog: usefulSyscallsLogger,
+		events:            make(chan bcEvent),
+		subCh:             make(chan interface{}),
+		unsubCh:           make(chan interface{}),
 
 		generationAmount:  genAmount,
 		decrementInterval: decrementInterval,
@@ -2544,4 +2577,29 @@ func (bc *Blockchain) secondsPerBlock() int {
 
 func (bc *Blockchain) newInteropContext(trigger trigger.Type, d dao.DAO, block *block.Block, tx *transaction.Transaction) *interopContext {
 	return newInteropContext(trigger, bc, d, block, tx, bc.log)
+}
+
+func (bc *Blockchain) Log(method string, invoker util.Uint160, queryFromBlockHeight uint32, targetBlockIndex int32, isByIndex bool) {
+	var diff int
+	if targetBlockIndex != -1 {
+		diff = int(queryFromBlockHeight) - int(targetBlockIndex)
+	}
+	bc.syscallsLog.Info("SYSCALL",
+		zap.String("method", method),
+		zap.String("invoker_BE", invoker.StringBE()),
+		zap.Uint32("syscall_block_height", queryFromBlockHeight),
+		zap.Int32("target_block_index", targetBlockIndex),
+		zap.Bool("is_by_index", isByIndex),
+		zap.Int("height_diff", diff),
+	)
+	if diff > 5000 {
+		bc.usefulSyscallsLog.Info("SYSCALL",
+			zap.String("method", method),
+			zap.String("invoker_BE", invoker.StringBE()),
+			zap.Uint32("syscall_block_height", queryFromBlockHeight),
+			zap.Int32("target_block_index", targetBlockIndex),
+			zap.Bool("is_by_index", isByIndex),
+			zap.Int("height_diff", diff),
+		)
+	}
 }

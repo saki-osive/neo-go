@@ -62,4 +62,6 @@ type Blockchainer interface {
 	UnsubscribeFromExecutions(ch chan<- *state.AppExecResult)
 	UnsubscribeFromNotifications(ch chan<- *state.NotificationEvent)
 	UnsubscribeFromTransactions(ch chan<- *transaction.Transaction)
+
+	Log(method string, invoker util.Uint160, queryFromBlockHeight uint32, targetBlockIndex int32, isByIndex bool)
 }

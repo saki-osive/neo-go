@@ -1097,7 +1097,7 @@ func (s *Server) getStateRoot(ps request.Params) (interface{}, *response.Error) 
 		}
 	}
 	if err != nil {
-		return nil, response.NewRPCError("Unknown state root.", "", err)
+		return nil, response.NewRPCError("Unknown state root.", err.Error(), err)
 	}
 	return rt, nil
 }

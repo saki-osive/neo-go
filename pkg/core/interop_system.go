@@ -32,32 +32,39 @@ type StorageContext struct {
 // getBlockHashFromElement converts given vm.Element to block hash using given
 // Blockchainer if needed. Interop functions accept both block numbers and
 // block hashes as parameters, thus this function is needed.
-func getBlockHashFromElement(bc Blockchainer, element *vm.Element) (util.Uint256, error) {
-	var hash util.Uint256
+func getBlockHashFromElement(bc Blockchainer, element *vm.Element) (bool, util.Uint256, error) {
+	var (
+		hash      util.Uint256
+		isByIndex bool
+	)
 	hashbytes := element.Bytes()
 	if len(hashbytes) <= 5 {
 		hashint := element.BigInt().Int64()
 		if hashint < 0 || hashint > math.MaxUint32 {
-			return hash, errors.New("bad block index")
+			return isByIndex, hash, errors.New("bad block index")
 		}
 		hash = bc.GetHeaderHash(int(hashint))
+		isByIndex = true
 	} else {
-		return util.Uint256DecodeBytesBE(hashbytes)
+		hash, err := util.Uint256DecodeBytesBE(hashbytes)
+		return isByIndex, hash, err
 	}
-	return hash, nil
+	return isByIndex, hash, nil
 }
 
 // bcGetBlock returns current block.
 func (ic *interopContext) bcGetBlock(v *vm.VM) error {
-	hash, err := getBlockHashFromElement(ic.bc, v.Estack().Pop())
+	isByIndex, hash, err := getBlockHashFromElement(ic.bc, v.Estack().Pop())
 	if err != nil {
 		return err
 	}
 	block, err := ic.bc.GetBlock(hash)
 	if err != nil {
 		v.Estack().PushVal([]byte{})
+		ic.bc.Log("GetBlock", v.Context().ScriptHash(), ic.bc.BlockHeight(), -1, isByIndex)
 	} else {
 		v.Estack().PushVal(vm.NewInteropItem(block))
+		ic.bc.Log("GetBlock", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(block.Index), isByIndex)
 	}
 	return nil
 }
@@ -80,15 +87,17 @@ func (ic *interopContext) bcGetContract(v *vm.VM) error {
 
 // bcGetHeader returns block header.
 func (ic *interopContext) bcGetHeader(v *vm.VM) error {
-	hash, err := getBlockHashFromElement(ic.bc, v.Estack().Pop())
+	isByIndex, hash, err := getBlockHashFromElement(ic.bc, v.Estack().Pop())
 	if err != nil {
 		return err
 	}
 	header, err := ic.bc.GetHeader(hash)
 	if err != nil {
 		v.Estack().PushVal([]byte{})
+		ic.bc.Log("GetHeader", v.Context().ScriptHash(), ic.bc.BlockHeight(), -1, isByIndex)
 	} else {
 		v.Estack().PushVal(vm.NewInteropItem(header))
+		ic.bc.Log("GetHeader", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(header.Index), isByIndex)
 	}
 	return nil
 }
@@ -112,11 +121,12 @@ func getTransactionAndHeight(cd *dao.Cached, v *vm.VM) (*transaction.Transaction
 
 // bcGetTransaction returns transaction.
 func (ic *interopContext) bcGetTransaction(v *vm.VM) error {
-	tx, _, err := getTransactionAndHeight(ic.dao, v)
+	tx, h, err := getTransactionAndHeight(ic.dao, v)
 	if err != nil {
 		return err
 	}
 	v.Estack().PushVal(vm.NewInteropItem(tx))
+	ic.bc.Log("GetTransaction", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(h), false)
 	return nil
 }
 
@@ -127,6 +137,7 @@ func (ic *interopContext) bcGetTransactionHeight(v *vm.VM) error {
 		return err
 	}
 	v.Estack().PushVal(h)
+	ic.bc.Log("GetTransactionHeight", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(h), false)
 	return nil
 }
 

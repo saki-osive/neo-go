@@ -11,7 +11,7 @@ type (
 	Error struct {
 		Code     int64  `json:"code"`
 		HTTPCode int    `json:"-"`
-		Cause    error  `json:"-"`
+		Cause    error  `json:"cause"`
 		Message  string `json:"message"`
 		Data     string `json:"data,omitempty"`
 	}
