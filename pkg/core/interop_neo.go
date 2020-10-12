@@ -8,6 +8,8 @@ import (
 	"math/big"
 
 	"github.com/btcsuite/btcd/btcec"
+	gherr "github.com/pkg/errors"
+
 	"github.com/nspcc-dev/neo-go/pkg/core/state"
 	"github.com/nspcc-dev/neo-go/pkg/core/storage"
 	"github.com/nspcc-dev/neo-go/pkg/core/transaction"
@@ -18,7 +20,6 @@ import (
 	"github.com/nspcc-dev/neo-go/pkg/util"
 	"github.com/nspcc-dev/neo-go/pkg/vm"
 	"github.com/nspcc-dev/neo-go/pkg/vm/emit"
-	gherr "github.com/pkg/errors"
 )
 
 const (
@@ -48,6 +49,7 @@ func (ic *interopContext) headerGetVersion(v *vm.VM) error {
 		return err
 	}
 	v.Estack().PushVal(header.Version)
+	ic.bc.Log("Neo.Header.GetVersion", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(header.Index))
 	return nil
 }
 
@@ -58,6 +60,7 @@ func (ic *interopContext) headerGetConsensusData(v *vm.VM) error {
 		return err
 	}
 	v.Estack().PushVal(header.ConsensusData)
+	ic.bc.Log("Neo.Header.GetConsensusData", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(header.Index))
 	return nil
 }
 
@@ -68,6 +71,7 @@ func (ic *interopContext) headerGetMerkleRoot(v *vm.VM) error {
 		return err
 	}
 	v.Estack().PushVal(header.MerkleRoot.BytesBE())
+	ic.bc.Log("Neo.Header.GetMerkleRoot", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(header.Index))
 	return nil
 }
 
@@ -78,6 +82,7 @@ func (ic *interopContext) headerGetNextConsensus(v *vm.VM) error {
 		return err
 	}
 	v.Estack().PushVal(header.NextConsensus.BytesBE())
+	ic.bc.Log("Neo.Header.GetNextConsensus", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(header.Index))
 	return nil
 }
 
@@ -96,6 +101,10 @@ func (ic *interopContext) txGetAttributes(v *vm.VM) error {
 		attrs = append(attrs, vm.NewInteropItem(&tx.Attributes[i]))
 	}
 	v.Estack().PushVal(attrs)
+	_, h, err := ic.bc.GetTransaction(tx.Hash())
+	if err == nil {
+		ic.bc.Log("Neo.Transaction.GetAttributes", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(h))
+	}
 	return nil
 }
 
@@ -114,6 +123,10 @@ func (ic *interopContext) txGetInputs(v *vm.VM) error {
 		inputs = append(inputs, vm.NewInteropItem(&tx.Inputs[i]))
 	}
 	v.Estack().PushVal(inputs)
+	_, h, err := ic.bc.GetTransaction(tx.Hash())
+	if err == nil {
+		ic.bc.Log("Neo.Transaction.GetInputs", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(h))
+	}
 	return nil
 }
 
@@ -132,6 +145,10 @@ func (ic *interopContext) txGetOutputs(v *vm.VM) error {
 		outputs = append(outputs, vm.NewInteropItem(&tx.Outputs[i]))
 	}
 	v.Estack().PushVal(outputs)
+	_, h, err := ic.bc.GetTransaction(tx.Hash())
+	if err == nil {
+		ic.bc.Log("Neo.Transaction.GetOutputs", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(h))
+	}
 	return nil
 }
 
@@ -160,6 +177,10 @@ func (ic *interopContext) txGetReferences(v *vm.VM) error {
 		}
 	}
 	v.Estack().PushVal(stackrefs)
+	_, h, err := ic.bc.GetTransaction(tx.Hash())
+	if err == nil {
+		ic.bc.Log("Neo.Transaction.GetReferences", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(h))
+	}
 	return nil
 }
 
@@ -171,6 +192,10 @@ func (ic *interopContext) txGetType(v *vm.VM) error {
 		return errors.New("value is not a transaction")
 	}
 	v.Estack().PushVal(int(tx.Type))
+	_, h, err := ic.bc.GetTransaction(tx.Hash())
+	if err == nil {
+		ic.bc.Log("Neo.Transaction.GetType", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(h))
+	}
 	return nil
 }
 
@@ -196,6 +221,10 @@ func (ic *interopContext) txGetUnspentCoins(v *vm.VM) error {
 		}
 	}
 	v.Estack().PushVal(items)
+	_, h, err := ic.bc.GetTransaction(tx.Hash())
+	if err == nil {
+		ic.bc.Log("Neo.Transaction.GetUnspentCoins", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(h))
+	}
 	return nil
 }
 
@@ -214,6 +243,10 @@ func (ic *interopContext) txGetWitnesses(v *vm.VM) error {
 		scripts = append(scripts, vm.NewInteropItem(&tx.Scripts[i]))
 	}
 	v.Estack().PushVal(scripts)
+	_, h, err := ic.bc.GetTransaction(tx.Hash())
+	if err == nil {
+		ic.bc.Log("Neo.Transaction.GetWitnesses", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(h))
+	}
 	return nil
 }
 
@@ -232,6 +265,10 @@ func (ic *interopContext) invocationTxGetScript(v *vm.VM) error {
 	script := make([]byte, len(inv.Script))
 	copy(script, inv.Script)
 	v.Estack().PushVal(script)
+	_, h, err := ic.bc.GetTransaction(tx.Hash())
+	if err == nil {
+		ic.bc.Log("Neo.Transaction.GetWitnesses", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(h))
+	}
 	return nil
 }
 

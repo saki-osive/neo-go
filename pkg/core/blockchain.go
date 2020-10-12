@@ -9,6 +9,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
 	"github.com/nspcc-dev/neo-go/pkg/config"
 	"github.com/nspcc-dev/neo-go/pkg/core/block"
 	"github.com/nspcc-dev/neo-go/pkg/core/dao"
@@ -25,9 +29,6 @@ import (
 	"github.com/nspcc-dev/neo-go/pkg/util"
 	"github.com/nspcc-dev/neo-go/pkg/vm"
 	"github.com/nspcc-dev/neo-go/pkg/vm/emit"
-	"github.com/pkg/errors"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 // Tuning parameters.
@@ -2579,26 +2580,17 @@ func (bc *Blockchain) newInteropContext(trigger trigger.Type, d dao.DAO, block *
 	return newInteropContext(trigger, bc, d, block, tx, bc.log)
 }
 
-func (bc *Blockchain) Log(method string, invoker util.Uint160, queryFromBlockHeight uint32, targetBlockIndex int32, isByIndex bool) {
-	var diff int
+func (bc *Blockchain) Log(method string, invoker util.Uint160, queryFromBlockHeight uint32, targetBlockIndex int32) {
+	diff := -1
 	if targetBlockIndex != -1 {
 		diff = int(queryFromBlockHeight) - int(targetBlockIndex)
 	}
-	bc.syscallsLog.Info("SYSCALL",
-		zap.String("method", method),
-		zap.String("invoker_BE", invoker.StringBE()),
-		zap.Uint32("syscall_block_height", queryFromBlockHeight),
-		zap.Int32("target_block_index", targetBlockIndex),
-		zap.Bool("is_by_index", isByIndex),
-		zap.Int("height_diff", diff),
-	)
-	if diff > 5000 {
-		bc.usefulSyscallsLog.Info("SYSCALL",
+	if diff == -1 || diff >= 128000 {
+		bc.syscallsLog.Info("SYSCALL",
 			zap.String("method", method),
 			zap.String("invoker_BE", invoker.StringBE()),
 			zap.Uint32("syscall_block_height", queryFromBlockHeight),
 			zap.Int32("target_block_index", targetBlockIndex),
-			zap.Bool("is_by_index", isByIndex),
 			zap.Int("height_diff", diff),
 		)
 	}

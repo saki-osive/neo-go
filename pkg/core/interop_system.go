@@ -54,17 +54,15 @@ func getBlockHashFromElement(bc Blockchainer, element *vm.Element) (bool, util.U
 
 // bcGetBlock returns current block.
 func (ic *interopContext) bcGetBlock(v *vm.VM) error {
-	isByIndex, hash, err := getBlockHashFromElement(ic.bc, v.Estack().Pop())
+	_, hash, err := getBlockHashFromElement(ic.bc, v.Estack().Pop())
 	if err != nil {
 		return err
 	}
 	block, err := ic.bc.GetBlock(hash)
 	if err != nil {
 		v.Estack().PushVal([]byte{})
-		ic.bc.Log("GetBlock", v.Context().ScriptHash(), ic.bc.BlockHeight(), -1, isByIndex)
 	} else {
 		v.Estack().PushVal(vm.NewInteropItem(block))
-		ic.bc.Log("GetBlock", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(block.Index), isByIndex)
 	}
 	return nil
 }
@@ -87,17 +85,15 @@ func (ic *interopContext) bcGetContract(v *vm.VM) error {
 
 // bcGetHeader returns block header.
 func (ic *interopContext) bcGetHeader(v *vm.VM) error {
-	isByIndex, hash, err := getBlockHashFromElement(ic.bc, v.Estack().Pop())
+	_, hash, err := getBlockHashFromElement(ic.bc, v.Estack().Pop())
 	if err != nil {
 		return err
 	}
 	header, err := ic.bc.GetHeader(hash)
 	if err != nil {
 		v.Estack().PushVal([]byte{})
-		ic.bc.Log("GetHeader", v.Context().ScriptHash(), ic.bc.BlockHeight(), -1, isByIndex)
 	} else {
 		v.Estack().PushVal(vm.NewInteropItem(header))
-		ic.bc.Log("GetHeader", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(header.Index), isByIndex)
 	}
 	return nil
 }
@@ -121,12 +117,11 @@ func getTransactionAndHeight(cd *dao.Cached, v *vm.VM) (*transaction.Transaction
 
 // bcGetTransaction returns transaction.
 func (ic *interopContext) bcGetTransaction(v *vm.VM) error {
-	tx, h, err := getTransactionAndHeight(ic.dao, v)
+	tx, _, err := getTransactionAndHeight(ic.dao, v)
 	if err != nil {
 		return err
 	}
 	v.Estack().PushVal(vm.NewInteropItem(tx))
-	ic.bc.Log("GetTransaction", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(h), false)
 	return nil
 }
 
@@ -137,7 +132,6 @@ func (ic *interopContext) bcGetTransactionHeight(v *vm.VM) error {
 		return err
 	}
 	v.Estack().PushVal(h)
-	ic.bc.Log("GetTransactionHeight", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(h), false)
 	return nil
 }
 
@@ -164,6 +158,7 @@ func (ic *interopContext) headerGetIndex(v *vm.VM) error {
 		return err
 	}
 	v.Estack().PushVal(header.Index)
+	ic.bc.Log("Neo.Header.GetIndex", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(header.Index))
 	return nil
 }
 
@@ -174,6 +169,7 @@ func (ic *interopContext) headerGetHash(v *vm.VM) error {
 		return err
 	}
 	v.Estack().PushVal(header.Hash().BytesBE())
+	ic.bc.Log("Neo.Header.GetHash", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(header.Index))
 	return nil
 }
 
@@ -184,6 +180,7 @@ func (ic *interopContext) headerGetPrevHash(v *vm.VM) error {
 		return err
 	}
 	v.Estack().PushVal(header.PrevHash.BytesBE())
+	ic.bc.Log("Neo.Header.GetPrevHash", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(header.Index))
 	return nil
 }
 
@@ -194,6 +191,7 @@ func (ic *interopContext) headerGetTimestamp(v *vm.VM) error {
 		return err
 	}
 	v.Estack().PushVal(header.Timestamp)
+	ic.bc.Log("Neo.Header.GetTimestamp", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(header.Index))
 	return nil
 }
 
@@ -205,6 +203,7 @@ func (ic *interopContext) blockGetTransactionCount(v *vm.VM) error {
 		return errors.New("value is not a block")
 	}
 	v.Estack().PushVal(len(block.Transactions))
+	ic.bc.Log("Neo.Block.GetTransactionCount", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(block.Index))
 	return nil
 }
 
@@ -223,6 +222,7 @@ func (ic *interopContext) blockGetTransactions(v *vm.VM) error {
 		txes = append(txes, vm.NewInteropItem(tx))
 	}
 	v.Estack().PushVal(txes)
+	ic.bc.Log("Neo.Block.GetTransactions", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(block.Index))
 	return nil
 }
 
@@ -240,6 +240,8 @@ func (ic *interopContext) blockGetTransaction(v *vm.VM) error {
 	}
 	tx := block.Transactions[index]
 	v.Estack().PushVal(vm.NewInteropItem(tx))
+	ic.bc.Log("Neo.Block.GetTransaction", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(block.Index))
+
 	return nil
 }
 
@@ -251,6 +253,10 @@ func (ic *interopContext) txGetHash(v *vm.VM) error {
 		return errors.New("value is not a transaction")
 	}
 	v.Estack().PushVal(tx.Hash().BytesBE())
+	_, h, err := ic.bc.GetTransaction(tx.Hash())
+	if err == nil {
+		ic.bc.Log("Neo.Transaction.GetHash", v.Context().ScriptHash(), ic.bc.BlockHeight(), int32(h))
+	}
 	return nil
 }
 

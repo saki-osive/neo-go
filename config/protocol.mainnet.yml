@@ -30,7 +30,7 @@ ProtocolConfiguration:
     IssueTransaction: 500
     PublishTransaction: 500
     RegisterTransaction: 10000
-  VerifyBlocks: true
+  VerifyBlocks: false
   VerifyTransactions: false
   FreeGasLimit: {0: 10.0, 6195000: 50.0}
   MaxTransactionsPerBlock: {0: 500, 6195000: 200}
@@ -43,16 +43,16 @@ ApplicationConfiguration:
   # LogPath could be set up in case you need stdout logs to some proper file.
   # LogPath: "./log/neogo.log"
   DBConfiguration:
-    Type: "leveldb" #other options: 'inmemory','redis','boltdb', 'badgerdb'.
+    Type: "boltdb" #other options: 'inmemory','redis','boltdb', 'badgerdb'.
     # DB type options. Uncomment those you need in case you want to switch DB type.
-    LevelDBOptions:
-      DataDirectoryPath: "./chains/mainnet"
-  #    RedisDBOptions:
-  #      Addr: "localhost:6379"
-  #      Password: ""
-  #      DB: 0
-  #    BoltDBOptions:
-  #      FilePath: "./chains/mainnet.bolt"
+    #  LevelDBOptions:
+    #    DataDirectoryPath: "./chains/testnet"
+    #    RedisDBOptions:
+    #      Addr: "localhost:6379"
+    #      Password: ""
+    #      DB: 0
+    BoltDBOptions:
+      FilePath: "./chains/mainnet.bolt"
   #    BadgerDBOptions:
   #      BadgerDir: "./chains/mainnet.badger"
   #  Uncomment in order to set up custom address for node.
