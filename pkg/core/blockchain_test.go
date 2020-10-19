@@ -818,7 +818,7 @@ func TestSubscriptions(t *testing.T) {
 	txGood2.ValidUntilBlock = 100500
 	require.NoError(t, signTx(bc, txGood2))
 
-	invBlock := newBlock(bc.config, bc.BlockHeight()+1, bc.CurrentHeaderHash(), txGood1, txBad, txGood2)
+	invBlock := newBlockState(bc.config, bc.BlockHeight()+1, bc.CurrentHeaderHash(), bc.dao.MPT.StateRoot(), txGood1, txBad, txGood2)
 	require.NoError(t, bc.AddBlock(invBlock))
 
 	require.Eventually(t, func() bool {

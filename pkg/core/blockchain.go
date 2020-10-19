@@ -418,6 +418,11 @@ func (bc *Blockchain) AddBlock(block *block.Block) error {
 		return fmt.Errorf("expected %d, got %d: %w", expectedHeight, block.Index, ErrInvalidBlockIndex)
 	}
 
+	if sr := bc.dao.MPT.StateRoot(); block.StateRoot != sr {
+		return fmt.Errorf("%w: %s != %s",
+			ErrHdrInvalidStateRoot, block.StateRoot.StringLE(), sr.StringLE())
+	}
+
 	if block.Index == bc.HeaderHeight()+1 {
 		err := bc.addHeaders(bc.config.VerifyBlocks, block.Header())
 		if err != nil {
@@ -546,8 +551,16 @@ func (bc *Blockchain) GetStateProof(root util.Uint256, key []byte) ([][]byte, er
 }
 
 // GetStateRoot returns state root for a given height.
-func (bc *Blockchain) GetStateRoot(height uint32) (*state.MPTRootState, error) {
-	return bc.dao.GetStateRoot(height)
+func (bc *Blockchain) GetStateRoot(height uint32) (util.Uint256, error) {
+	if height == bc.BlockHeight() {
+		return bc.dao.MPT.StateRoot(), nil
+	}
+	h := bc.GetHeaderHash(int(height + 1))
+	hdr, err := bc.GetHeader(h)
+	if err != nil {
+		return util.Uint256{}, err
+	}
+	return hdr.StateRoot, nil
 }
 
 // storeBlock performs chain update using the block given, it executes all
@@ -646,11 +659,13 @@ func (bc *Blockchain) storeBlock(block *block.Block, txpool *mempool.Pool) error
 		}
 		prevHash = hash.DoubleSha256(prev.GetSignedPart())
 	}
-	err = bc.AddStateRoot(&state.MPTRoot{
-		MPTRootBase: state.MPTRootBase{
-			Index:    block.Index,
-			PrevHash: prevHash,
-			Root:     root,
+	err = bc.dao.PutStateRoot(&state.MPTRootState{
+		MPTRoot: state.MPTRoot{
+			MPTRootBase: state.MPTRootBase{
+				Index:    block.Index,
+				PrevHash: prevHash,
+				Root:     root,
+			},
 		},
 	})
 	if err != nil {
@@ -1186,6 +1201,7 @@ var (
 	ErrHdrHashMismatch     = errors.New("previous header hash doesn't match")
 	ErrHdrIndexMismatch    = errors.New("previous header index doesn't match")
 	ErrHdrInvalidTimestamp = errors.New("block is not newer than the previous one")
+	ErrHdrInvalidStateRoot = errors.New("state root for previous block is invalid")
 )
 
 func (bc *Blockchain) verifyHeader(currHeader, prevHeader *block.Header) error {
@@ -1344,81 +1360,7 @@ func (bc *Blockchain) isTxStillRelevant(t *transaction.Transaction, txpool *memp
 
 // StateHeight returns height of the verified state root.
 func (bc *Blockchain) StateHeight() uint32 {
-	h, _ := bc.dao.GetCurrentStateRootHeight()
-	return h
-}
-
-// AddStateRoot add new (possibly unverified) state root to the blockchain.
-func (bc *Blockchain) AddStateRoot(r *state.MPTRoot) error {
-	our, err := bc.GetStateRoot(r.Index)
-	if err == nil {
-		if our.Flag == state.Verified {
-			return bc.updateStateHeight(r.Index)
-		} else if r.Witness == nil && our.Witness != nil {
-			r.Witness = our.Witness
-		}
-	}
-	if err := bc.verifyStateRoot(r); err != nil {
-		return fmt.Errorf("invalid state root: %w", err)
-	}
-	if r.Index > bc.BlockHeight() { // just put it into the store for future checks
-		return bc.dao.PutStateRoot(&state.MPTRootState{
-			MPTRoot: *r,
-			Flag:    state.Unverified,
-		})
-	}
-
-	flag := state.Unverified
-	if r.Witness != nil {
-		if err := bc.verifyStateRootWitness(r); err != nil {
-			return fmt.Errorf("can't verify signature: %w", err)
-		}
-		flag = state.Verified
-	}
-	err = bc.dao.PutStateRoot(&state.MPTRootState{
-		MPTRoot: *r,
-		Flag:    flag,
-	})
-	if err != nil {
-		return err
-	}
-	return bc.updateStateHeight(r.Index)
-}
-
-func (bc *Blockchain) updateStateHeight(newHeight uint32) error {
-	h, err := bc.dao.GetCurrentStateRootHeight()
-	if err != nil {
-		return fmt.Errorf("can't get current state root height: %w", err)
-	} else if newHeight == h+1 {
-		updateStateHeightMetric(newHeight)
-		return bc.dao.PutCurrentStateRootHeight(h + 1)
-	}
-	return nil
-}
-
-// verifyStateRoot checks if state root is valid.
-func (bc *Blockchain) verifyStateRoot(r *state.MPTRoot) error {
-	if r.Index == 0 {
-		return nil
-	}
-	prev, err := bc.GetStateRoot(r.Index - 1)
-	if err != nil {
-		return errors.New("can't get previous state root")
-	} else if !r.PrevHash.Equals(hash.DoubleSha256(prev.GetSignedPart())) {
-		return errors.New("previous hash mismatch")
-	} else if prev.Version != r.Version {
-		return errors.New("version mismatch")
-	}
-	return nil
-}
-
-// verifyStateRootWitness verifies that state root signature is correct.
-func (bc *Blockchain) verifyStateRootWitness(r *state.MPTRoot) error {
-	b, err := bc.GetBlock(bc.GetHeaderHash(int(r.Index)))
-	if err != nil {
-		return err
-	}
-	return bc.VerifyWitness(b.NextConsensus, r, r.Witness, bc.contracts.Policy.GetMaxVerificationGas(bc.dao))
+	return bc.BlockHeight()
 }
 
 // VerifyTx verifies whether transaction is bonafide or not relative to the

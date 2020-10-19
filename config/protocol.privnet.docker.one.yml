@@ -52,7 +52,7 @@ ApplicationConfiguration:
     Enabled: true
     Port: 20001
   Pprof:
-    Enabled: false
+    Enabled: true
     Port: 20011
   UnlockWallet:
     Path: "/wallet1.json"

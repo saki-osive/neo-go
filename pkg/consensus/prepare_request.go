@@ -12,7 +12,7 @@ type prepareRequest struct {
 	timestamp         uint64
 	nonce             uint64
 	transactionHashes []util.Uint256
-	stateRootSig      [signatureSize]byte
+	stateRoot         util.Uint256
 }
 
 var _ payload.PrepareRequest = (*prepareRequest)(nil)
@@ -22,7 +22,7 @@ func (p *prepareRequest) EncodeBinary(w *io.BinWriter) {
 	w.WriteU64LE(p.timestamp)
 	w.WriteU64LE(p.nonce)
 	w.WriteArray(p.transactionHashes)
-	w.WriteBytes(p.stateRootSig[:])
+	w.WriteBytes(p.stateRoot[:])
 }
 
 // DecodeBinary implements io.Serializable interface.
@@ -30,7 +30,7 @@ func (p *prepareRequest) DecodeBinary(r *io.BinReader) {
 	p.timestamp = r.ReadU64LE()
 	p.nonce = r.ReadU64LE()
 	r.ReadArray(&p.transactionHashes, block.MaxTransactionsPerBlock)
-	r.ReadBytes(p.stateRootSig[:])
+	r.ReadBytes(p.stateRoot[:])
 }
 
 // Timestamp implements payload.PrepareRequest interface.

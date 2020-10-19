@@ -13,6 +13,7 @@ type (
 	// recoveryMessage represents dBFT Recovery message.
 	recoveryMessage struct {
 		preparationHash     *util.Uint256
+		stateRoot           *util.Uint256
 		preparationPayloads []*preparationCompact
 		commitPayloads      []*commitCompact
 		changeViewPayloads  []*changeViewCompact
@@ -36,7 +37,6 @@ type (
 	preparationCompact struct {
 		ValidatorIndex   uint8
 		InvocationScript []byte
-		StateRootSig     [signatureSize]byte
 	}
 )
 
@@ -129,14 +129,12 @@ func (p *commitCompact) EncodeBinary(w *io.BinWriter) {
 func (p *preparationCompact) DecodeBinary(r *io.BinReader) {
 	p.ValidatorIndex = r.ReadB()
 	p.InvocationScript = r.ReadVarBytes(1024)
-	r.ReadBytes(p.StateRootSig[:])
 }
 
 // EncodeBinary implements io.Serializable interface.
 func (p *preparationCompact) EncodeBinary(w *io.BinWriter) {
 	w.WriteB(p.ValidatorIndex)
 	w.WriteVarBytes(p.InvocationScript)
-	w.WriteBytes(p.StateRootSig[:])
 }
 
 // AddPayload implements payload.RecoveryMessage interface.
@@ -155,13 +153,11 @@ func (m *recoveryMessage) AddPayload(p payload.ConsensusPayload) {
 		m.preparationPayloads = append(m.preparationPayloads, &preparationCompact{
 			ValidatorIndex:   validator,
 			InvocationScript: p.(*Payload).Witness.InvocationScript,
-			StateRootSig:     p.GetPrepareRequest().(*prepareRequest).stateRootSig,
 		})
 	case payload.PrepareResponseType:
 		m.preparationPayloads = append(m.preparationPayloads, &preparationCompact{
 			ValidatorIndex:   validator,
 			InvocationScript: p.(*Payload).Witness.InvocationScript,
-			StateRootSig:     p.GetPrepareResponse().(*prepareResponse).stateRootSig,
 		})
 
 		if m.preparationHash == nil {
@@ -222,7 +218,6 @@ func (m *recoveryMessage) GetPrepareResponses(p payload.ConsensusPayload, valida
 	for i, resp := range m.preparationPayloads {
 		r := fromPayload(prepareResponseType, p.(*Payload), &prepareResponse{
 			preparationHash: *m.preparationHash,
-			stateRootSig:    resp.StateRootSig,
 		})
 		r.SetValidatorIndex(uint16(resp.ValidatorIndex))
 		r.Witness.InvocationScript = resp.InvocationScript

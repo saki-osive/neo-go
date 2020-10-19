@@ -56,7 +56,7 @@ type rpcTestCase struct {
 }
 
 const testContractHash = "b0fda4dd46b8e5d207e86e774a4a133c6db69ee7"
-const deploymentTxHash = "59f7b22b90e26f883a56b916c1580e3ee4f13caded686353cd77577e6194c173"
+const deploymentTxHash = "5ac510a3904f7d9f211fcc469129dfbaf1ae0d826a61c1d17419b5d72db750d1"
 
 const verifyContractHash = "c1213693b22cb0454a436d6e0bd76b8c0a3bfdf7"
 const verifyContractAVM = "570300412d51083021700c14aa8acf859d4fe402b34e673f2156821796a488ebdb30716813cedb2869db289740"
@@ -873,7 +873,7 @@ func testRPCProtocol(t *testing.T, doRPCCall func(string, string, *testing.T) []
 		require.NoError(t, err)
 
 		rpc := fmt.Sprintf(`{"jsonrpc": "2.0", "id": 1, "method": "getproof", "params": ["%s", "%s", "%x"]}`,
-			r.Root.StringLE(), testContractHash, []byte("testkey"))
+			r.StringLE(), testContractHash, []byte("testkey"))
 		body := doRPCCall(rpc, httpSrv.URL, t)
 		rawRes := checkErrGetResult(t, body, false)
 		res := new(result.GetProof)
@@ -885,7 +885,7 @@ func testRPCProtocol(t *testing.T, doRPCCall func(string, string, *testing.T) []
 		require.True(t, len(res.Result.Proof) > 0)
 
 		rpc = fmt.Sprintf(`{"jsonrpc": "2.0", "id": 1, "method": "verifyproof", "params": ["%s", "%s"]}`,
-			r.Root.StringLE(), res.Result.String())
+			r.StringLE(), res.Result.String())
 		body = doRPCCall(rpc, httpSrv.URL, t)
 		rawRes = checkErrGetResult(t, body, false)
 		vp := new(result.VerifyProof)
@@ -904,7 +904,7 @@ func testRPCProtocol(t *testing.T, doRPCCall func(string, string, *testing.T) []
 
 			expected, err := e.chain.GetStateRoot(5)
 			require.NoError(t, err)
-			require.Equal(t, expected, res)
+			require.Equal(t, expected, res.Root)
 		}
 		t.Run("ByHeight", func(t *testing.T) { testRoot(t, strconv.FormatInt(5, 10)) })
 		t.Run("ByHash", func(t *testing.T) { testRoot(t, `"`+chain.GetHeaderHash(5).StringLE()+`"`) })

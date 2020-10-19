@@ -17,7 +17,6 @@ import (
 	"github.com/nspcc-dev/neo-go/pkg/core/blockchainer"
 	"github.com/nspcc-dev/neo-go/pkg/core/cache"
 	"github.com/nspcc-dev/neo-go/pkg/core/state"
-	"github.com/nspcc-dev/neo-go/pkg/core/storage"
 	"github.com/nspcc-dev/neo-go/pkg/core/transaction"
 	"github.com/nspcc-dev/neo-go/pkg/network/capability"
 	"github.com/nspcc-dev/neo-go/pkg/network/payload"
@@ -558,11 +557,6 @@ func (s *Server) handleGetDataCmd(p Peer, inv *payload.Inventory) error {
 			} else {
 				notFound = append(notFound, hash)
 			}
-		case payload.StateRootType:
-			r := s.stateCache.Get(hash)
-			if r != nil {
-				msg = NewMessage(CMDStateRoot, r.(*state.MPTRoot))
-			}
 		case payload.ConsensusType:
 			if cp := s.consensus.GetPayload(hash); cp != nil {
 				msg = NewMessage(CMDConsensus, cp)
@@ -667,33 +661,6 @@ func (s *Server) handleGetHeadersCmd(p Peer, gh *payload.GetBlockByIndex) error 
 	return p.EnqueueP2PMessage(msg)
 }
 
-// handleGetStateRootCmd processees `getroots` request.
-func (s *Server) handleGetStateRootCmd(p Peer, gr *payload.GetStateRoot) error {
-	r, err := s.chain.GetStateRoot(gr.Index)
-	if err != nil {
-		if errors.Is(err, storage.ErrKeyNotFound) {
-			return nil
-		}
-		return err
-	}
-	msg := NewMessage(CMDStateRoot, &r.MPTRoot)
-	return p.EnqueueP2PMessage(msg)
-}
-
-// handleStateRootCmd processees `stateroot` request.
-func (s *Server) handleStateRootCmd(r *state.MPTRoot) error {
-	// we ignore error, because there is nothing wrong if we already have this state root
-	if r.Index <= s.chain.StateHeight() {
-		return nil
-	}
-	err := s.chain.AddStateRoot(r)
-	if err == nil && !s.stateCache.Has(r.Hash()) {
-		s.stateCache.Add(r)
-		s.broadcastMessage(NewMessage(CMDStateRoot, r))
-	}
-	return nil
-}
-
 // handleConsensusCmd processes received consensus payload.
 // It never returns an error.
 func (s *Server) handleConsensusCmd(cp *consensus.Payload) error {
@@ -779,9 +746,6 @@ func (s *Server) handleMessage(peer Peer, msg *Message) error {
 		case CMDGetHeaders:
 			gh := msg.Payload.(*payload.GetBlockByIndex)
 			return s.handleGetHeadersCmd(peer, gh)
-		case CMDGetStateRoot:
-			gr := msg.Payload.(*payload.GetStateRoot)
-			return s.handleGetStateRootCmd(peer, gr)
 		case CMDInv:
 			inventory := msg.Payload.(*payload.Inventory)
 			return s.handleInvCmd(peer, inventory)
@@ -797,9 +761,6 @@ func (s *Server) handleMessage(peer Peer, msg *Message) error {
 		case CMDTX:
 			tx := msg.Payload.(*transaction.Transaction)
 			return s.handleTxCmd(tx)
-		case CMDStateRoot:
-			r := msg.Payload.(*state.MPTRoot)
-			return s.handleStateRootCmd(r)
 		case CMDPing:
 			ping := msg.Payload.(*payload.Ping)
 			return s.handlePing(peer, ping)

@@ -844,7 +844,7 @@ func (s *Server) getStateRoot(ps request.Params) (interface{}, *response.Error) 
 	if p == nil {
 		return nil, response.NewRPCError("Invalid parameter.", "", nil)
 	}
-	var rt *state.MPTRootState
+	var rt util.Uint256
 	var h util.Uint256
 	height, err := p.GetInt()
 	if err == nil {
@@ -858,7 +858,14 @@ func (s *Server) getStateRoot(ps request.Params) (interface{}, *response.Error) 
 	if err != nil {
 		return nil, response.NewRPCError("Unknown state root.", "", err)
 	}
-	return rt, nil
+	return &state.MPTRootState{
+		MPTRoot: state.MPTRoot{
+			MPTRootBase: state.MPTRootBase{
+				Index: uint32(height),
+				Root:  rt,
+			},
+		},
+	}, nil
 }
 
 func (s *Server) getStorage(ps request.Params) (interface{}, *response.Error) {

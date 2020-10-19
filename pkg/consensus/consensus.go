@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 	"time"
 
@@ -176,7 +175,6 @@ func NewService(cfg Config) (Service, error) {
 		dbft.WithNewRecoveryRequest(func() payload.RecoveryRequest { return new(recoveryRequest) }),
 		dbft.WithNewRecoveryMessage(func() payload.RecoveryMessage { return new(recoveryMessage) }),
 		dbft.WithVerifyPrepareRequest(srv.verifyRequest),
-		dbft.WithVerifyPrepareResponse(srv.verifyResponse),
 	)
 
 	if srv.dbft == nil {
@@ -284,56 +282,18 @@ func (s *service) handleChainBlock(b *coreb.Block) {
 
 func (s *service) newPrepareRequest() payload.PrepareRequest {
 	res := new(prepareRequest)
-	sig := s.getStateRootSig()
-	if sig != nil {
-		copy(res.stateRootSig[:], sig)
+	if sr, err := s.Chain.GetStateRoot(s.dbft.BlockIndex - 1); err == nil {
+		res.stateRoot = sr
 	}
 	return res
 }
 
-func (s *service) getStateRootSig() []byte {
-	var sig []byte
-
-	sr, err := s.Chain.GetStateRoot(s.dbft.BlockIndex - 1)
-	if err == nil {
-		data := sr.GetSignedPart()
-		sig, _ = s.dbft.Priv.Sign(data)
-	}
-	return sig
-}
-
 func (s *service) newCommit() payload.Commit {
-	// This is being called when we're ready to commit, so we can safely
-	// relay stateroot here.
-	stateRoot, err := s.Chain.GetStateRoot(s.dbft.Context.BlockIndex - 1)
-	if err != nil {
-		s.log.Warn("can't get stateroot", zap.Uint32("block", s.dbft.Context.BlockIndex-1))
-		return new(commit)
-	}
-	r := stateRoot.MPTRoot
-	r.Witness = s.getWitness(func(ctx dbft.Context, i int) []byte {
-		if p := ctx.PreparationPayloads[i]; p != nil && p.ViewNumber() == ctx.ViewNumber {
-			if int(ctx.PrimaryIndex) == i {
-				return p.GetPrepareRequest().(*prepareRequest).stateRootSig[:]
-			}
-			return p.GetPrepareResponse().(*prepareResponse).stateRootSig[:]
-		}
-		return nil
-	})
-	if err := s.Chain.AddStateRoot(&r); err != nil {
-		s.log.Warn("errors while adding state root", zap.Error(err))
-	}
-	s.Broadcast(&r)
 	return new(commit)
 }
 
 func (s *service) newPrepareResponse() payload.PrepareResponse {
-	res := new(prepareResponse)
-	sig := s.getStateRootSig()
-	if sig != nil {
-		copy(res.stateRootSig[:], sig)
-	}
-	return res
+	return new(prepareResponse)
 }
 
 func (s *service) validatePayload(p *Payload) bool {
@@ -452,6 +412,15 @@ func (s *service) verifyBlock(b block.Block) bool {
 		s.log.Warn("proposed block has already outdated")
 		return false
 	}
+	sr, err := s.Chain.GetStateRoot(coreb.Index - 1)
+	if err != nil {
+		s.log.Warn("can't get previous state root")
+		return false
+	}
+	if sr != coreb.StateRoot {
+		s.log.Warn("state root is invalid")
+		return false
+	}
 	maxBlockSize := int(s.Chain.GetMaxBlockSize())
 	size := io.GetVarSize(coreb)
 	if size > maxBlockSize {
@@ -499,34 +468,18 @@ func (s *service) verifyBlock(b block.Block) bool {
 	return true
 }
 
-func (s *service) verifyStateRootSig(index int, sig []byte) error {
-	r, err := s.Chain.GetStateRoot(s.dbft.BlockIndex - 1)
-	if err != nil {
-		return fmt.Errorf("can't get local state root: %v", err)
-	}
-	validators := s.getValidators()
-	if index >= len(validators) {
-		return errors.New("bad validator index")
-	}
-
-	pub := validators[index]
-	if pub.Verify(r.GetSignedPart(), sig) != nil {
-		return errors.New("bad state root signature")
-	}
-	return nil
-}
-
 func (s *service) verifyRequest(p payload.ConsensusPayload) error {
 	req := p.GetPrepareRequest().(*prepareRequest)
 	// Save lastProposal for getVerified().
 	s.lastProposal = req.transactionHashes
-
-	return s.verifyStateRootSig(int(p.ValidatorIndex()), req.stateRootSig[:])
-}
-
-func (s *service) verifyResponse(p payload.ConsensusPayload) error {
-	resp := p.GetPrepareResponse().(*prepareResponse)
-	return s.verifyStateRootSig(int(p.ValidatorIndex()), resp.stateRootSig[:])
+	sr, err := s.Chain.GetStateRoot(s.dbft.BlockIndex - 1)
+	if err != nil {
+		return err
+	}
+	if sr != req.stateRoot {
+		return errors.New("state root mismatch")
+	}
+	return nil
 }
 
 func (s *service) processBlock(b block.Block) {
@@ -671,6 +624,11 @@ func (s *service) newBlockFromContext(ctx *dbft.Context) block.Block {
 	block.Block.Network = s.network
 	block.Block.Timestamp = ctx.Timestamp / nsInMs
 	block.Block.Index = ctx.BlockIndex
+	sr, err := s.Chain.GetStateRoot(ctx.BlockIndex - 1)
+	if err != nil {
+		return nil
+	}
+	block.StateRoot = sr
 
 	validators, err := s.Chain.GetValidators()
 	if err != nil {

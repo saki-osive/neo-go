@@ -48,10 +48,14 @@ func newTestChain(t *testing.T) *Blockchain {
 
 func (bc *Blockchain) newBlock(txs ...*transaction.Transaction) *block.Block {
 	lastBlock := bc.topBlock.Load().(*block.Block)
-	return newBlock(bc.config, lastBlock.Index+1, lastBlock.Hash(), txs...)
+	return newBlockState(bc.config, lastBlock.Index+1, lastBlock.Hash(), bc.dao.MPT.StateRoot(), txs...)
 }
 
 func newBlock(cfg config.ProtocolConfiguration, index uint32, prev util.Uint256, txs ...*transaction.Transaction) *block.Block {
+	return newBlockState(cfg, index, prev, util.Uint256{}, txs...)
+}
+
+func newBlockState(cfg config.ProtocolConfiguration, index uint32, prev, sr util.Uint256, txs ...*transaction.Transaction) *block.Block {
 	validators, _ := validatorsFromConfig(cfg)
 	valScript, _ := smartcontract.CreateDefaultMultiSigRedeemScript(validators)
 	witness := transaction.Witness{
@@ -62,6 +66,7 @@ func newBlock(cfg config.ProtocolConfiguration, index uint32, prev util.Uint256,
 			Network:       testchain.Network(),
 			Version:       0,
 			PrevHash:      prev,
+			StateRoot:     sr,
 			Timestamp:     uint64(time.Now().UTC().Unix())*1000 + uint64(index),
 			Index:         index,
 			NextConsensus: witness.ScriptHash(),
@@ -83,7 +88,7 @@ func (bc *Blockchain) genBlocks(n int) ([]*block.Block, error) {
 	lastHash := bc.topBlock.Load().(*block.Block).Hash()
 	lastIndex := bc.topBlock.Load().(*block.Block).Index
 	for i := 0; i < n; i++ {
-		blocks[i] = newBlock(bc.config, uint32(i)+lastIndex+1, lastHash)
+		blocks[i] = newBlockState(bc.config, uint32(i)+lastIndex+1, lastHash, bc.dao.MPT.StateRoot())
 		if err := bc.AddBlock(blocks[i]); err != nil {
 			return blocks, err
 		}

@@ -21,7 +21,6 @@ type Blockchainer interface {
 	GetConfig() config.ProtocolConfiguration
 	AddHeaders(...*block.Header) error
 	AddBlock(*block.Block) error
-	AddStateRoot(r *state.MPTRoot) error
 	CalculateClaimable(value *big.Int, startHeight, endHeight uint32) *big.Int
 	Close()
 	HeaderHeight() uint32
@@ -45,7 +44,7 @@ type Blockchainer interface {
 	GetStandByCommittee() keys.PublicKeys
 	GetStandByValidators() keys.PublicKeys
 	GetStateProof(root util.Uint256, key []byte) ([][]byte, error)
-	GetStateRoot(height uint32) (*state.MPTRootState, error)
+	GetStateRoot(height uint32) (util.Uint256, error)
 	GetStorageItem(id int32, key []byte) *state.StorageItem
 	GetStorageItems(id int32) (map[string]*state.StorageItem, error)
 	GetTestVM(tx *transaction.Transaction) *vm.VM

@@ -43,6 +43,9 @@ type Base struct {
 	// necessary for correct signing/verification.
 	Network netmode.Magic
 
+	// StateRoot is state root for the previous block.
+	StateRoot util.Uint256
+
 	// Hash of this block, created when binary encoded (double SHA256).
 	hash util.Uint256
 
@@ -61,6 +64,7 @@ type baseAux struct {
 	Timestamp     uint64                `json:"time"`
 	Index         uint32                `json:"index"`
 	NextConsensus string                `json:"nextconsensus"`
+	PrevStateRoot util.Uint256          `json:"stateroot"`
 	Witnesses     []transaction.Witness `json:"witnesses"`
 }
 
@@ -130,6 +134,7 @@ func (b *Base) encodeHashableFields(bw *io.BinWriter) {
 	bw.WriteU64LE(b.Timestamp)
 	bw.WriteU32LE(b.Index)
 	bw.WriteBytes(b.NextConsensus[:])
+	bw.WriteBytes(b.StateRoot[:])
 }
 
 // decodeHashableFields decodes the fields used for hashing.
@@ -141,6 +146,7 @@ func (b *Base) decodeHashableFields(br *io.BinReader) {
 	b.Timestamp = br.ReadU64LE()
 	b.Index = br.ReadU32LE()
 	br.ReadBytes(b.NextConsensus[:])
+	br.ReadBytes(b.StateRoot[:])
 
 	// Make the hash of the block here so we dont need to do this
 	// again.
@@ -158,6 +164,7 @@ func (b Base) MarshalJSON() ([]byte, error) {
 		MerkleRoot:    b.MerkleRoot,
 		Timestamp:     b.Timestamp,
 		Index:         b.Index,
+		PrevStateRoot: b.StateRoot,
 		NextConsensus: address.Uint160ToString(b.NextConsensus),
 		Witnesses:     []transaction.Witness{b.Script},
 	}
@@ -187,6 +194,7 @@ func (b *Base) UnmarshalJSON(data []byte) error {
 	b.Timestamp = aux.Timestamp
 	b.Index = aux.Index
 	b.NextConsensus = nextC
+	b.StateRoot = aux.PrevStateRoot
 	b.Script = aux.Witnesses[0]
 	if !aux.Hash.Equals(b.Hash()) {
 		return errors.New("json 'hash' doesn't match block hash")

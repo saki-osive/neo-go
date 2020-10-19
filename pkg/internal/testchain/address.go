@@ -162,12 +162,15 @@ func NewBlock(t *testing.T, bc blockchainer.Blockchainer, offset uint32, primary
 	h := bc.GetHeaderHash(int(height))
 	hdr, err := bc.GetHeader(h)
 	require.NoError(t, err)
+	sr, err := bc.GetStateRoot(height)
+	require.NoError(t, err)
 	b := &block.Block{
 		Base: block.Base{
 			PrevHash:      hdr.Hash(),
 			Timestamp:     (uint64(time.Now().UTC().Unix()) + uint64(hdr.Index)) * 1000,
 			Index:         hdr.Index + offset,
 			NextConsensus: witness.ScriptHash(),
+			StateRoot:     sr,
 			Script:        witness,
 			Network:       bc.GetConfig().Magic,
 		},
