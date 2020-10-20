@@ -204,9 +204,9 @@ func (bc *Blockchain) init() error {
 	}
 	bc.blockHeight = bHeight
 	bc.persistedHeight = bHeight
-	if err = bc.dao.InitMPT(bHeight); err != nil {
-		return fmt.Errorf("can't init MPT at height %d: %w", bHeight, err)
-	}
+	// if err = bc.dao.InitMPT(bHeight); err != nil {
+	// 	return fmt.Errorf("can't init MPT at height %d: %w", bHeight, err)
+	// }
 
 	bc.headerHashes, err = bc.dao.GetHeaderHashes()
 	if err != nil {
@@ -630,25 +630,25 @@ func (bc *Blockchain) storeBlock(block *block.Block, txpool *mempool.Pool) error
 	}
 	writeBuf.Reset()
 
-	root := bc.dao.MPT.StateRoot()
-	var prevHash util.Uint256
-	if block.Index > 0 {
-		prev, err := bc.dao.GetStateRoot(block.Index - 1)
-		if err != nil {
-			return fmt.Errorf("can't get previous state root: %w", err)
-		}
-		prevHash = hash.DoubleSha256(prev.GetSignedPart())
-	}
-	err = bc.AddStateRoot(&state.MPTRoot{
-		MPTRootBase: state.MPTRootBase{
-			Index:    block.Index,
-			PrevHash: prevHash,
-			Root:     root,
-		},
-	})
-	if err != nil {
-		return err
-	}
+	// root := bc.dao.MPT.StateRoot()
+	// var prevHash util.Uint256
+	// if block.Index > 0 {
+	// 	prev, err := bc.dao.GetStateRoot(block.Index - 1)
+	// 	if err != nil {
+	// 		return fmt.Errorf("can't get previous state root: %w", err)
+	// 	}
+	// 	prevHash = hash.DoubleSha256(prev.GetSignedPart())
+	// }
+	// err = bc.AddStateRoot(&state.MPTRoot{
+	// 	MPTRootBase: state.MPTRootBase{
+	// 		Index:    block.Index,
+	// 		PrevHash: prevHash,
+	// 		Root:     root,
+	// 	},
+	// })
+	// if err != nil {
+	// 	return err
+	// }
 
 	if bc.config.SaveStorageBatch {
 		bc.lastBatch = cache.DAO.GetBatch()
