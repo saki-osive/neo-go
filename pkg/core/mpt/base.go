@@ -99,6 +99,9 @@ func encodeNodeWithType(n Node, w *io.BinWriter) {
 
 // DecodeNodeWithType decodes node together with it's type.
 func DecodeNodeWithType(r *io.BinReader) Node {
+	if r.Err != nil {
+		return nil
+	}
 	var n Node
 	switch typ := NodeType(r.ReadB()); typ {
 	case BranchT:
