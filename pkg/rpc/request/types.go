@@ -1,7 +1,9 @@
 package request
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -35,43 +37,108 @@ type Raw struct {
 	ID        int           `json:"id"`
 }
 
-// In represents a standard JSON-RPC 2.0
-// request: http://www.jsonrpc.org/specification#request_object. It's used in
-// server to represent incoming queries.
+// In contains standard JSON-RPC 2.0 request and batch of
+// requests: http://www.jsonrpc.org/specification.
+// It's used in server to represent incoming queries.
 type In struct {
+	Request *Request
+	Batch   Batch
+}
+
+// Request represents a standard JSON-RPC 2.0
+// request: http://www.jsonrpc.org/specification#request_object.
+type Request struct {
 	JSONRPC   string          `json:"jsonrpc"`
 	Method    string          `json:"method"`
 	RawParams json.RawMessage `json:"params,omitempty"`
 	RawID     json.RawMessage `json:"id,omitempty"`
+	Error     error           `json:"-"`
 }
 
-// NewIn creates a new Request struct.
-func NewIn() *In {
-	return &In{
-		JSONRPC: JSONRPCVersion,
+// Batch represents a standard JSON-RPC 2.0
+// batch: https://www.jsonrpc.org/specification#batch.
+type Batch []*Request
+
+// MarshalJSON implement JSON Marshaller interface
+func (i In) MarshalJSON() ([]byte, error) {
+	if i.Request != nil {
+		return json.Marshal(i.Request)
 	}
+	return json.Marshal(i.Batch)
+}
+
+// UnmarshalJSON implements json.Unmarshaler interface.
+func (i *In) UnmarshalJSON(data []byte) error {
+	var (
+		req   *Request
+		batch Batch
+	)
+	switch data[0] {
+	case '[':
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.Token() // `[` and `]`
+		for decoder.More() {
+			r := NewRequest()
+			decodeErr := decoder.Decode(r)
+			if decodeErr != nil {
+				r.Error = decodeErr
+			} else if r.JSONRPC != JSONRPCVersion {
+				r.Error = fmt.Errorf("invalid version, expected 2.0 got: '%s'", r.JSONRPC)
+			}
+			batch = append(batch, r)
+		}
+		if len(batch) == 0 {
+			r := NewRequest()
+			r.Error = errors.New("empty request")
+			batch = append(batch, r)
+		}
+	case '{':
+		req = NewRequest()
+		err := json.Unmarshal(data, req)
+		if err != nil {
+			return fmt.Errorf("error parsing JSON payload: %w", err)
+		}
+		if req.JSONRPC != JSONRPCVersion {
+			return fmt.Errorf("invalid version, expected 2.0 got: '%s'", req.JSONRPC)
+		}
+	default:
+		return errors.New("unexpected JSON format")
+	}
+
+	i.Request = req
+	i.Batch = batch
+	return nil
 }
 
 // DecodeData decodes the given reader into the the request
 // struct.
-func (r *In) DecodeData(data io.ReadCloser) error {
+func (i *In) DecodeData(data io.ReadCloser) error {
 	defer data.Close()
 
-	err := json.NewDecoder(data).Decode(r)
+	rawData := json.RawMessage{}
+	err := json.NewDecoder(data).Decode(&rawData)
 	if err != nil {
 		return fmt.Errorf("error parsing JSON payload: %w", err)
 	}
 
-	if r.JSONRPC != JSONRPCVersion {
-		return fmt.Errorf("invalid version, expected 2.0 got: '%s'", r.JSONRPC)
-	}
+	return i.UnmarshalJSON(rawData)
+}
 
-	return nil
+// NewIn creates a new In struct.
+func NewIn() *In {
+	return &In{}
+}
+
+// NewRequest creates a new Request struct.
+func NewRequest() *Request {
+	return &Request{
+		JSONRPC: JSONRPCVersion,
+	}
 }
 
 // Params takes a slice of any type and attempts to bind
 // the params to it.
-func (r *In) Params() (*Params, error) {
+func (r *Request) Params() (*Params, error) {
 	params := Params{}
 
 	err := json.Unmarshal(r.RawParams, &params)

@@ -318,7 +318,7 @@ func TestWSFilteredSubscriptions(t *testing.T) {
 					ws, err := upgrader.Upgrade(w, req, nil)
 					require.NoError(t, err)
 					ws.SetReadDeadline(time.Now().Add(2 * time.Second))
-					req := request.In{}
+					req := request.Request{}
 					err = ws.ReadJSON(&req)
 					require.NoError(t, err)
 					params, err := req.Params()

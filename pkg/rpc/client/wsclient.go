@@ -48,7 +48,7 @@ type Notification struct {
 // requestResponse is a combined type for request and response since we can get
 // any of them here.
 type requestResponse struct {
-	request.In
+	request.Request
 	Error  *response.Error `json:"error,omitempty"`
 	Result json.RawMessage `json:"result,omitempty"`
 }

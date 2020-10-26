@@ -225,7 +225,7 @@ func (s *Server) Shutdown() error {
 }
 
 func (s *Server) handleHTTPRequest(w http.ResponseWriter, httpRequest *http.Request) {
-	req := request.NewIn()
+	in := request.NewIn()
 
 	if httpRequest.URL.Path == "/ws" && httpRequest.Method == "GET" {
 		// Technically there is a race between this check and
@@ -237,7 +237,7 @@ func (s *Server) handleHTTPRequest(w http.ResponseWriter, httpRequest *http.Requ
 		s.subsLock.RUnlock()
 		if numOfSubs >= maxSubscribers {
 			s.writeHTTPErrorResponse(
-				req,
+				request.NewRequest(),
 				w,
 				response.NewInternalServerError("websocket users limit reached", nil),
 			)
@@ -248,7 +248,7 @@ func (s *Server) handleHTTPRequest(w http.ResponseWriter, httpRequest *http.Requ
 			s.log.Info("websocket connection upgrade failed", zap.Error(err))
 			return
 		}
-		resChan := make(chan response.Abstract)
+		resChan := make(chan interface{}) // response.Abstract or []response.Abstract
 		subChan := make(chan *websocket.PreparedMessage, notificationBufSize)
 		subscr := &subscriber{writer: subChan, ws: ws}
 		s.subsLock.Lock()
@@ -261,7 +261,7 @@ func (s *Server) handleHTTPRequest(w http.ResponseWriter, httpRequest *http.Requ
 
 	if httpRequest.Method != "POST" {
 		s.writeHTTPErrorResponse(
-			req,
+			request.NewRequest(),
 			w,
 			response.NewInvalidParamsError(
 				fmt.Sprintf("Invalid method '%s', please retry with 'POST'", httpRequest.Method), nil,
@@ -270,17 +270,33 @@ func (s *Server) handleHTTPRequest(w http.ResponseWriter, httpRequest *http.Requ
 		return
 	}
 
-	err := req.DecodeData(httpRequest.Body)
+	err := in.DecodeData(httpRequest.Body)
 	if err != nil {
-		s.writeHTTPErrorResponse(req, w, response.NewParseError("Problem parsing JSON-RPC request body", err))
+		s.writeHTTPErrorResponse(request.NewRequest(), w, response.NewParseError("Problem parsing JSON-RPC request body", err))
 		return
 	}
 
-	resp := s.handleRequest(req, nil)
-	s.writeHTTPServerResponse(req, w, resp)
+	resp := s.handleIn(in, nil)
+	s.writeHTTPServerResponse(in, w, resp)
 }
 
-func (s *Server) handleRequest(req *request.In, sub *subscriber) response.Abstract {
+func (s *Server) handleIn(in *request.In, sub *subscriber) interface{} {
+	if in.Request != nil {
+		return s.handleRequest(in.Request, sub)
+	}
+	resp := make([]response.Abstract, len(in.Batch))
+	// TODO: routine
+	for i, req := range in.Batch {
+		if req.Error != nil {
+			resp[i] = s.packResponse(req, nil, response.NewParseError("Problem parsing JSON-RPC request body", req.Error))
+		} else {
+			resp[i] = s.handleRequest(req, sub)
+		}
+	}
+	return resp
+}
+
+func (s *Server) handleRequest(req *request.Request, sub *subscriber) response.Abstract {
 	var res interface{}
 	var resErr *response.Error
 
@@ -308,7 +324,7 @@ func (s *Server) handleRequest(req *request.In, sub *subscriber) response.Abstra
 	return s.packResponse(req, res, resErr)
 }
 
-func (s *Server) handleWsWrites(ws *websocket.Conn, resChan <-chan response.Abstract, subChan <-chan *websocket.PreparedMessage) {
+func (s *Server) handleWsWrites(ws *websocket.Conn, resChan <-chan interface{}, subChan <-chan *websocket.PreparedMessage) {
 	pingTicker := time.NewTicker(wsPingPeriod)
 eventloop:
 	for {
@@ -355,25 +371,36 @@ drainloop:
 	}
 }
 
-func (s *Server) handleWsReads(ws *websocket.Conn, resChan chan<- response.Abstract, subscr *subscriber) {
+func (s *Server) handleWsReads(ws *websocket.Conn, resChan chan<- interface{}, subscr *subscriber) {
 	ws.SetReadLimit(wsReadLimit)
 	ws.SetReadDeadline(time.Now().Add(wsPongLimit))
 	ws.SetPongHandler(func(string) error { ws.SetReadDeadline(time.Now().Add(wsPongLimit)); return nil })
 requestloop:
 	for {
-		req := new(request.In)
-		err := ws.ReadJSON(req)
+		in := request.NewIn()
+		err := ws.ReadJSON(in)
 		if err != nil {
 			break
 		}
-		res := s.handleRequest(req, subscr)
-		if res.Error != nil {
-			s.logRequestError(req, res.Error)
+		resp := s.handleIn(in, subscr)
+		switch {
+		case in.Request != nil:
+			r := resp.(response.Abstract)
+			if r.Error != nil {
+				s.logRequestError(in.Request, r.Error)
+			}
+		case in.Batch != nil:
+			responses := resp.([]response.Abstract)
+			for i, r := range responses {
+				if r.Error != nil {
+					s.logRequestError(in.Batch[i], r.Error) // can use `i` because the order matches
+				}
+			}
 		}
 		select {
 		case <-s.shutdown:
 			break requestloop
-		case resChan <- res:
+		case resChan <- resp:
 		}
 
 	}
@@ -1333,7 +1360,7 @@ func (s *Server) blockHeightFromParam(param *request.Param) (int, *response.Erro
 	return num, nil
 }
 
-func (s *Server) packResponse(r *request.In, result interface{}, respErr *response.Error) response.Abstract {
+func (s *Server) packResponse(r *request.Request, result interface{}, respErr *response.Error) response.Abstract {
 	resp := response.Abstract{
 		HeaderAndError: response.HeaderAndError{
 			Header: response.Header{
@@ -1351,7 +1378,7 @@ func (s *Server) packResponse(r *request.In, result interface{}, respErr *respon
 }
 
 // logRequestError is a request error logger.
-func (s *Server) logRequestError(r *request.In, jsonErr *response.Error) {
+func (s *Server) logRequestError(r *request.Request, jsonErr *response.Error) {
 	logFields := []zap.Field{
 		zap.Error(jsonErr.Cause),
 		zap.String("method", r.Method),
@@ -1366,16 +1393,26 @@ func (s *Server) logRequestError(r *request.In, jsonErr *response.Error) {
 }
 
 // writeHTTPErrorResponse writes an error response to the ResponseWriter.
-func (s *Server) writeHTTPErrorResponse(r *request.In, w http.ResponseWriter, jsonErr *response.Error) {
+func (s *Server) writeHTTPErrorResponse(r *request.Request, w http.ResponseWriter, jsonErr *response.Error) {
 	resp := s.packResponse(r, nil, jsonErr)
-	s.writeHTTPServerResponse(r, w, resp)
+	s.writeHTTPServerResponse(&request.In{Request: r}, w, resp)
 }
 
-func (s *Server) writeHTTPServerResponse(r *request.In, w http.ResponseWriter, resp response.Abstract) {
+func (s *Server) writeHTTPServerResponse(in *request.In, w http.ResponseWriter, resp interface{}) {
 	// Errors can happen in many places and we can only catch ALL of them here.
-	if resp.Error != nil {
-		s.logRequestError(r, resp.Error)
-		w.WriteHeader(resp.Error.HTTPCode)
+	switch {
+	case in.Request != nil:
+		r := resp.(response.Abstract)
+		if r.Error != nil {
+			s.logRequestError(in.Request, r.Error)
+			w.WriteHeader(r.Error.HTTPCode)
+		}
+	case in.Batch != nil:
+		for i, resp := range resp.([]response.Abstract) {
+			if resp.Error != nil {
+				s.logRequestError(in.Batch[i], resp.Error) // can use `i` because the order matches
+			}
+		}
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if s.config.EnableCORSWorkaround {
@@ -1387,9 +1424,15 @@ func (s *Server) writeHTTPServerResponse(r *request.In, w http.ResponseWriter, r
 	err := encoder.Encode(resp)
 
 	if err != nil {
-		s.log.Error("Error encountered while encoding response",
-			zap.String("err", err.Error()),
-			zap.String("method", r.Method))
+		switch {
+		case in.Request != nil:
+			s.log.Error("Error encountered while encoding response",
+				zap.String("err", err.Error()),
+				zap.String("method", in.Request.Method))
+		case in.Batch != nil:
+			s.log.Error("Error encountered while encoding batch response",
+				zap.String("err", err.Error()))
+		}
 	}
 }
 
