@@ -835,10 +835,10 @@ func (bc *Blockchain) storeBlock(block *block.Block) error {
 					index++
 				}
 			} else {
-				bc.log.Warn("contract invocation failed",
-					zap.String("tx", tx.Hash().StringLE()),
-					zap.Uint32("block", block.Index),
-					zap.Error(err))
+				// bc.log.Warn("contract invocation failed",
+				// 	zap.String("tx", tx.Hash().StringLE()),
+				// 	zap.Uint32("block", block.Index),
+				// 	zap.Error(err))
 			}
 			aer := &state.AppExecResult{
 				TxHash:      tx.Hash(),

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/nspcc-dev/neo-go/pkg/core/storage"
 	"github.com/nspcc-dev/neo-go/pkg/io"
@@ -389,6 +390,7 @@ func (t *Trie) PerformGC(root util.Uint256, st storage.Store) (int, error) {
 	}
 	var n int
 	for i := 0; i <= 0xFF; i += gcBatchSize {
+		start := time.Now()
 		t.gcMtx.Lock()
 		_, err := t.Store.Persist()
 		if err != nil {
@@ -408,6 +410,7 @@ func (t *Trie) PerformGC(root util.Uint256, st storage.Store) (int, error) {
 			t.gcMtx.Unlock()
 			return n, err
 		}
+		fmt.Println("delete", i, "time", time.Since(start))
 		t.gcMtx.Unlock()
 	}
 	return n, nil

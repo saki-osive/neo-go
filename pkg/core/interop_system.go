@@ -365,6 +365,7 @@ func (ic *interopContext) runtimeNotify(v *vm.VM) error {
 // runtimeLog logs the message passed.
 func (ic *interopContext) runtimeLog(v *vm.VM) error {
 	msg := fmt.Sprintf("%q", v.Estack().Pop().Bytes())
+	return nil
 	ic.log.Info("runtime log",
 		zap.Stringer("script", getContextScriptHash(v, 0)),
 		zap.String("logs", msg))
