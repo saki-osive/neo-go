@@ -27,7 +27,7 @@ type Trie struct {
 
 // GenerationSpan is an amount of blocks in a single generation.
 // It must be >= 65536 so we can store it in 2 bytes.
-const GenerationSpan = 200000
+const GenerationSpan = 100
 
 // ErrNotFound is returned when requested trie item is missing.
 var ErrNotFound = errors.New("item not found")
@@ -372,7 +372,7 @@ func updateGeneration(h util.Uint256, gen uint32, st storage.Store) error {
 }
 
 const (
-	gcLogBatchSize = 5
+	gcLogBatchSize = 6
 	gcBatchSize    = 1 << gcLogBatchSize
 )
 
